@@ -1,0 +1,3317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CoreTick - Premium Watch Store</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <script>
+        // --- Firebase Configuration ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyAQ0EGMeeS4FEjnONzRRfzXaitmX6rIPlk",
+          authDomain: "coretick-store.firebaseapp.com",
+          projectId: "coretick-store",
+          storageBucket: "coretick-store.firebasestorage.app",
+          messagingSenderId: "983161604699",
+          appId: "1:983161604699:web:fc2d4c8134e38111d30c4d7e",
+          measurementId: "G-0R7NSVJKKW"
+        };
+        
+        let db;
+        
+        // This MUST match the path in your Firebase Guide (Step 4)
+        // artifacts/default-app-id/public/data
+        const appId = 'default-app-id';
+
+        try {
+            // Initialize Firebase using the classic syntax
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            
+            // Set log level for debugging
+            firebase.firestore.setLogLevel('Debug');
+
+            console.log("Firebase initialized successfully (classic script).");
+
+        } catch (error) {
+            console.error("Firebase initialization failed:", error);
+            // We'll still allow the page to run, but real-time features will be disabled.
+        }
+        
+        // --- New Global Quick View Function ---
+        // This function is kept for backwards compatibility but its main use (opening a quick view modal) is now replaced by the detail page logic.
+        window.openQuickView = function(productCard) {
+            
+            // 1. Get the Product ID from the card
+            const productId = productCard.dataset.productId;
+            if (!productId) {
+                console.error("No product ID found on card. Make sure 'data-product-id' is set.");
+                return;
+            }
+            
+            // This function is now redirected to the detail page functionality when called from cards.
+            // If it were triggered elsewhere (like from old code), this would still run, but the core flow is the detail page.
+            console.log("Quick View Modal logic triggered for: " + productId + " (redirecting to Detail Page).");
+            openProductDetailPage(productId);
+        };
+    </script>
+    
+    <style>
+        /* Base font */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* --- CHANGED to gray-100 --- */
+        }
+
+        /* --- Preloader Styles --- */
+        #preloader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000; /* Black background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            opacity: 1; /* Ensure start opacity is 1 */
+            transition: opacity 0.75s ease;
+            flex-direction: column; /* Align content vertically */
+        }
+        #preloader.fade-out {
+            opacity: 0;
+        }
+        #preloader img {
+            width: 150px;
+            height: 150px;
+        }
+        
+        /* New spinner style */
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.2); /* Light grey border */
+            border-left-color: #ffffff; /* White loading part */
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        /* --- End Preloader Styles --- */
+
+
+        /* Custom Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes subtleFloat {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+        
+        @keyframes slideInRight {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+        
+        @keyframes slideOutRight {
+            from { transform: translateX(0); }
+            to { transform: translateX(100%); }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        /* --- NEW: Marquee Animation --- */
+        @keyframes marquee {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+
+        /* Animation Utility Classes */
+        .animate-fadeInUp {
+            animation: fadeInUp 1s ease-out forwards;
+        }
+        
+        .animate-fadeInUp-delay-1 {
+            opacity: 0; /* Start hidden */
+            animation: fadeInUp 1s ease-out 0.3s forwards;
+        }
+
+        .animate-fadeInUp-delay-2 {
+            opacity: 0; /* Start hidden */
+            animation: fadeInUp 1s ease-out 0.6s forwards;
+        }
+
+        .animate-subtleFloat {
+            animation: subtleFloat 4s ease-in-out infinite;
+        }
+        
+        /* Marquee Styling (UPDATED SPEED) */
+        .marquee-container {
+            width: 100%;
+            overflow: hidden;
+            white-space: nowrap;
+            background-color: #1f2937; /* Dark Gray */
+            color: #ffffff;
+            font-size: 0.875rem; /* text-sm */
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+            text-align: center;
+        }
+
+        .marquee-content {
+            display: inline-block;
+            padding-left: 100%;
+            /* UPDATED: Increased duration from 40s to 80s for slower animation (0.5x speed) */
+            animation: marquee 80s linear infinite; 
+            will-change: transform;
+            line-height: 1.25rem; /* line-5 */
+        }
+        
+        .marquee-item {
+            display: inline-block;
+            margin-right: 4rem; /* Spacing between messages */
+            font-weight: 600; /* semi-bold */
+        }
+
+        /* Scrollbar styling (optional, but adds to the theme) */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #222;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        /* Pagination active class */
+        .pagination-active {
+            z-index: 10;
+            color: white;
+            background-color: #000; /* black */
+            border-color: #000; /* black */
+        }
+        .pagination-inactive {
+            color: #6B7280; /* gray-500 */
+            background-color: #fff; /* white */
+            border-color: #D1D5DB; /* gray-300 */
+        }
+        .pagination-inactive:hover {
+            background-color: #F3F4F6; /* gray-100 */
+            color: #374151; /* gray-700 */
+        }
+        
+        /* Policy Page Styles */
+        .policy-page {
+            max-width: 48rem; /* Equivalent to max-w-3xl */
+            margin-left: auto;
+            margin-right: auto;
+            color: #374151; /* Equivalent to text-gray-700 */
+            background-color: #ffffff; /* --- ADDED white bg for page --- */
+            padding: 2rem; /* --- ADDED padding --- */
+            border-radius: 0.5rem; /* --- ADDED rounded corners --- */
+        }
+        .policy-page h2 {
+            font-size: 1.875rem; /* Equivalent to text-3xl */
+            line-height: 2.25rem; /* Equivalent to text-3xl */
+            font-weight: 700;
+            color: #000;
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+        .policy-page h3 {
+            font-size: 1.5rem; /* Equivalent to text-2xl */
+            line-height: 2rem; /* Equivalent to text-2xl */
+            font-weight: 600;
+            color: #000;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+        }
+        .policy-page p {
+            margin-bottom: 1rem;
+            line-height: 1.625; /* Equivalent to leading-relaxed */
+        }
+        .policy-page p.intro {
+            font-size: 1.125rem; /* Equivalent to text-lg */
+            font-weight: 500;
+            color: #1F2937; /* Equivalent to text-gray-800 */
+            margin-bottom: 1rem;
+        }
+        .policy-page ul {
+            list-style-type: disc;
+            list-style-position: outside;
+            margin-bottom: 1rem;
+            padding-left: 1.5rem; /* Equivalent to pl-6 */
+        }
+        /* --- ADDED space-y-2 equivalent --- */
+        .policy-page ul li {
+            margin-bottom: 0.5rem;
+        }
+        
+        /* --- FAQ Accordion Styles --- */
+        .faq-answer {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+        
+        .faq-item.active .faq-answer {
+            max-height: 75rem; /* Large value to allow content to expand */
+            transition: max-height 0.5s ease-in, padding 0.3s ease-in;
+            padding-top: 1rem;
+            padding-bottom: 1.5rem;
+        }
+        
+        /* Icon rotation */
+        .faq-item .faq-icon {
+            transition: transform 0.3s ease-in-out;
+        }
+        
+        /* --- Product Card Hover Styles --- */
+        .product-card .image-container {
+            position: relative;
+        }
+        .product-card .img-secondary {
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+        .product-card:hover .img-secondary {
+            opacity: 1;
+        }
+        .product-card .hover-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+        }
+        .product-card:hover .hover-overlay {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .product-card .wishlist-icon {
+            position: absolute;
+            top: 0.75rem; /* 12px */
+            right: 0.75rem; /* 12px */
+            z-index: 10;
+            transition: opacity 0.2s ease, transform 0.2s ease, color 0.2s ease; /* Added color transition */
+            color: #d1d5db; /* Default gray color (gray-300) */
+        }
+        .product-card:hover .wishlist-icon {
+            opacity: 1;
+            transform: scale(1);
+        }
+        .product-card .wishlist-icon.active {
+            color: #ef4444; /* Red color (red-500) when active */
+        }
+        
+        /* --- Modal (Quick View & Cart) Styles --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none; /* Allow clicks through when hidden */
+        }
+        .modal-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 100%;
+            max-width: 42rem; /* ~672px */
+            height: 100%;
+            background-color: white;
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease-in-out;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -10px 0 30px rgba(0,0,0,0.1);
+        }
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto; /* Block clicks when active */
+        }
+        .modal-panel.active {
+            transform: translateX(0);
+        }
+        .no-scroll {
+            overflow: hidden;
+        }
+
+        /* Stock progress bar */
+        .stock-progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #e5e7eb; /* gray-200 */
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+        .stock-progress-bar-inner {
+            height: 100%;
+            background-color: #ef4444; /* red-500 */
+            border-radius: 9999px;
+            transition: width 0.3s ease-out;
+        }
+        
+        /* --- Product Detail Page Styles --- */
+        .product-detail-container {
+            max-width: 80rem;
+            margin-left: auto;
+            margin-right: auto;
+            padding: 2rem 1.5rem;
+            background-color: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        @media (min-width: 768px) {
+            .product-detail-container {
+                padding: 3rem 2rem;
+            }
+        }
+        .detail-page-title {
+            font-size: 2.25rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .detail-page-price {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #1f2937; /* dark gray */
+            margin-bottom: 1.5rem;
+        }
+        .detail-description {
+            line-height: 1.625;
+            color: #4b5563; /* gray-600 */
+        }
+        .detail-image-gallery {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .detail-image-gallery img {
+            width: 100%;
+            height: auto;
+            object-fit: contain;
+            border-radius: 0.5rem;
+            background-color: #f3f4f6;
+        }
+        .detail-thumbnail-strip {
+            display: flex;
+            gap: 0.75rem;
+            overflow-x: auto;
+            padding-bottom: 0.5rem;
+        }
+        .detail-thumbnail-strip img {
+            width: 80px;
+            height: 80px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            opacity: 0.7;
+            transition: all 0.2s;
+        }
+        .detail-thumbnail-strip img.active,
+        .detail-thumbnail-strip img:hover {
+            opacity: 1;
+            border-color: #000;
+        }
+
+
+        /* --- NEW: Shopping Cart Page Styles --- */
+        .cart-page-container {
+            max-width: 80rem; /* max-w-7xl */
+            margin-left: auto;
+            margin-right: auto;
+            padding: 2rem 1.5rem; /* py-8 px-6 */
+        }
+        .cart-page-container h1 {
+            font-size: 2.25rem; /* text-4xl */
+            font-weight: 700; /* font-bold */
+            margin-bottom: 2rem; /* mb-8 */
+            text-align: center;
+        }
+        .cart-item-row {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr 1fr 1fr;
+            align-items: center;
+            gap: 1rem; /* gap-4 */
+            padding-top: 1.5rem; /* py-6 */
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid #e5e7eb; /* border-b border-gray-200 */
+        }
+        .cart-header-row {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr 1fr 1fr;
+            gap: 1rem; /* gap-4 */
+            padding-bottom: 1rem; /* pb-4 */
+            border-bottom: 2px solid #d1d5db; /* border-b-2 border-gray-300 */
+            font-weight: 600; /* font-semibold */
+            color: #4b5563; /* text-gray-600 */
+            text-transform: uppercase;
+            font-size: 0.75rem; /* text-xs */
+        }
+        /* Mobile responsive for cart */
+        @media (max-width: 768px) {
+            .cart-header-row {
+                display: none; /* Hide header on mobile */
+            }
+            .cart-item-row {
+                grid-template-columns: 100px 1fr; /* Image and content */
+                gap: 1.5rem; /* gap-6 */
+            }
+            .cart-item-row .cart-item-image {
+                grid-row: 1 / span 3; /* Image spans 3 rows */
+            }
+            .cart-item-row .cart-item-title {
+                grid-column: 2;
+                grid-row: 1;
+                font-weight: 600;
+            }
+            .cart-item-row .cart-item-qty {
+                grid-column: 2;
+                grid-row: 2;
+                justify-self: start; /* Align left */
+            }
+            .cart-item-row .cart-item-price,
+            .cart-item-row .cart-item-total,
+            .cart-item-row .cart-item-remove-placeholder {
+                display: none; /* Hide these columns */
+            }
+        }
+        
+        /* --- NEW: Confirmation Modal Styles (FIXED DISPLAY) --- */
+        #confirmation-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.75);
+            z-index: 1010;
+            display: none; /* Default is none */
+            justify-content: center;
+            align-items: center;
+        }
+        /* Only use flex when it has the active class */
+        #confirmation-overlay.active {
+            display: flex; 
+        }
+        #confirmation-modal {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            transform: translateY(-50px);
+            opacity: 0;
+            transition: all 0.3s ease-out;
+        }
+        #confirmation-overlay.active #confirmation-modal {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        /* --- NEW: Search Overlay Styles --- */
+        #search-overlay {
+            position: absolute;
+            top: 100%; /* Below the header */
+            left: 0;
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            color: white;
+            z-index: 40; /* Below sticky header, above main content */
+            padding: 1.5rem 0;
+            display: none; /* Hidden by default */
+            transition: height 0.3s ease;
+        }
+        #search-overlay.active {
+            display: block;
+        }
+        #search-input {
+            background-color: #374151; /* Darker gray background */
+            border: none;
+            color: white;
+            font-size: 1.25rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+        }
+        #search-input::placeholder {
+            color: #9ca3af; /* Light gray placeholder */
+        }
+        
+        /* Search Results Panel Styles */
+        #search-results-container {
+            max-height: 400px; /* Limit height for scroll */
+            overflow-y: auto;
+            margin-top: 1.5rem;
+            background-color: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .search-result-item {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid #f3f4f6;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .search-result-item:hover {
+            background-color: #f3f4f6; /* Gray-100 on hover */
+        }
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+        .search-result-item img {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 0.25rem;
+            margin-right: 1rem;
+        }
+        .search-result-details {
+            flex-grow: 1;
+        }
+        .search-result-details .title {
+            font-weight: 600;
+            color: #1f2937; /* Dark gray text */
+            margin-bottom: 0.25rem;
+        }
+        .search-result-details .price {
+            font-weight: 700;
+            color: #000; /* Black text */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-black antialiased">
+
+    <div id="preloader">
+        <h2 class="text-white text-2xl font-bold mt-4 tracking-wider">CORETICK</h2>
+        <div class="spinner mt-6"></div>
+    </div>
+    <div class="marquee-container">
+        <div class="marquee-content">
+            <span class="marquee-item">• Fast Shipping Nationwide •</span>
+            <span class="marquee-item">• 100% Authentic Watches •</span>
+            <span class="marquee-item">• Secure Shopping Experience Every Time •</span>
+            <span class="marquee-item">• Open Box Delivery Available •</span>
+            <span class="marquee-item">• 30-Day Return Warranty •</span>
+            <span class="marquee-item">• Fast Shipping Nationwide •</span>
+            <span class="marquee-item">• 100% Authentic Watches •</span>
+            <span class="marquee-item">• Secure Shopping Experience Every Time •</span>
+            <span class="marquee-item">• Open Box Delivery Available •</span>
+            <span class="marquee-item">• 30-Day Return Warranty •</span>
+        </div>
+    </div>
+    <header class="bg-black text-white shadow-lg sticky top-0 z-50 transition-all duration-300">
+        <nav class="container mx-auto px-6 py-5 flex justify-between items-center">
+            
+            <a href="#" id="home-link-logo" class="text-3xl font-bold tracking-tight uppercase">
+                CoreTick
+            </a>
+            
+            <div class="hidden md:flex items-center space-x-8">
+                <a href="#home" id="home-link" class="hover:text-gray-300 transition-colors duration-300">Home</a>
+                <a href="#shop" id="shop-link" class="hover:text-gray-300 transition-colors duration-300">Shop</a>
+                <a href="#about" id="about-link" class="hover:text-gray-300 transition-colors duration-300">About Us</a>
+                <a href="#contact" id="contact-link" class="hover:text-gray-300 transition-colors duration-300">Contact Us</a>
+            </div>
+            
+            <div class="flex items-center space-x-5">
+                <button id="search-icon-btn" class="hover:text-gray-300 transition-colors duration-300" aria-label="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </button>
+                <button id="wishlist-icon-btn" class="hover:text-gray-300 transition-colors duration-300 relative" aria-label="Wishlist">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" />
+                    </svg>
+                    <span id="wishlist-item-count-badge" class="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center hidden">0</span>
+                </button>
+                
+                <button id="cart-icon-btn" class="hover:text-gray-300 transition-colors duration-300 relative" aria-label="Cart">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                    <span id="cart-item-count-badge" class="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center hidden">0</span>
+                </button>
+                
+                <button id="menu-btn" class="md:hidden focus:outline-none" aria-label="Open menu">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16m-7 6h7" />
+                    </svg>
+                </button>
+            </div>
+        </nav>
+        
+        <div id="search-overlay">
+            <div class="container mx-auto px-6">
+                <div class="flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3 text-white flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input type="text" id="search-input" placeholder="Search for products..." class="w-full focus:ring-0 focus:outline-none">
+                    <button id="search-close-btn" class="text-gray-400 hover:text-white ml-3 flex-shrink-0" aria-label="Close search">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                <div id="search-results-container" class="w-full md:max-w-xl mx-auto mt-4 rounded-lg shadow-xl">
+                    </div>
+            </div>
+        </div>
+        <div id="mobile-menu" class="hidden md:hidden bg-black">
+            <a href="#home" id="mobile-home-link" class="block py-3 px-6 text-sm hover:bg-gray-800">Home</a>
+            <a href="#shop" id="mobile-shop-link" class="block py-3 px-6 text-sm hover:bg-gray-800">Shop</a>
+            <a href="#about" id="mobile-about-link" class="block py-3 px-6 text-sm hover:bg-gray-800">About Us</a>
+                <a href="#contact" id="mobile-contact-link" class="block py-3 px-6 text-sm hover:bg-gray-800">Contact Us</a>
+            </div>
+    </header>
+
+    <main>
+
+        <div id="main-content">
+            <section id="home" class="bg-black text-white py-20 md:py-32 overflow-hidden">
+                <div class="container mx-auto px-6 flex flex-col md:flex-row items-center">
+                    
+                    <div class="md:w-1/2 text-center md:text-left mb-10 md:mb-0 md:pr-12">
+                        <h1 class="text-4xl md:text-6xl font-bold tracking-tight leading-tight mb-6 animate-fadeInUp">
+                            Timeless Style, Modern Elegance
+                        </h1>
+                        <p class="text-lg md:text-xl text-gray-300 mb-10 animate-fadeInUp-delay-1">
+                            Explore our premium watch collection designed to elevate your style.
+                        </p>
+                        <a href="#shop" id="shop-link-hero" class="bg-white text-black font-bold py-3 px-8 rounded-lg text-lg hover:bg-gray-200 transition-all duration-300 animate-fadeInUp-delay-2">
+                            Shop Collection
+                        </a>
+                    </div>
+                    
+                    <div class="md:w-1/2 flex justify-center items-center">
+                        <img src="https://res.cloudinary.com/dzzd68fzx/image/upload/v1761473733/1675922477history-of-patek-philippe-nautilus_cqbvqt.jpg" 
+                             alt="Premium Watch" 
+                             onerror="this.src='https://placehold.co/450x450/111111/ffffff?text=Image+Failed+To+Load&font=inter'; this.onerror=null;"
+                             class="rounded-lg shadow-2xl animate-subtleFloat w-full max-w-lg object-contain h-auto">
+                    </div>
+                </div>
+            </section>
+
+            <section id="featured" class="py-24 bg-gray-100"> <div class="container mx-auto px-6">
+                    <h2 class="text-3xl md:text-4xl font-bold text-center mb-16">
+                        Our Featured Watches
+                    </h2>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
+                        
+                        <div class="product-card bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden transition-all duration-300 group hover:shadow-2xl hover:-translate-y-2" data-product-id="rolex-submariner-green-p1-1-0">
+                            <div class="image-container overflow-hidden h-72">
+                                
+                                <img src="https://res.cloudinary.com/dkesvcbnp/image/upload/v1761738995/Rolex_Submariner_-_Oyster_Perpetual_Date_Just_-_Rotating_Dial_-_Green_-_Silver_Chain_fmcjyb.avif" 
+                                     alt="Rolex Submariner - Oyster Perpetual Date Just - Rotating Dial - Green - Silver Chain" 
+                                     class="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105 img-primary">
+                                <img src="https://res.cloudinary.com/dkesvcbnp/image/upload/v1761753616/Rolex_Submariner_-_Oyster_Perpetual_Date_Just_-_Rotating_Dial_-_Green_-_Silver_Chain_1_hil8sl.webp" 
+                                     alt="Rolex Submariner alternate view" 
+                                     class="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105 img-secondary">
+                                
+                                <button class="wishlist-icon p-2 rounded-full shadow-md hover:bg-gray-100 transition-colors bg-white" aria-label="Add to Wishlist" data-product-id="rolex-submariner-green-p1-1-0">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" />
+                                    </svg>
+                                </button>
+                                
+                                <div class="hover-overlay">
+                                    <a href="#" class="quick-view-btn w-full bg-white text-black text-center py-2.5 px-4 rounded-lg font-semibold hover:bg-gray-200 transition-colors duration-300" data-product-id="rolex-submariner-green-p1-1-0">
+                                        Quick View
+                                    </a>
+                                    <a href="#" class="add-to-cart-btn w-full bg-black text-white text-center py-2.5 px-4 rounded-lg font-semibold hover:bg-gray-800 transition-colors duration-300"
+                                       data-product-id="rolex-submariner-green-p1" data-title="Rolex Submariner - Oyster Perpetual Date Just - Rotating Dial - Green - Silver Chain" data-price="PKR 3,799.00" data-img-src="https://res.cloudinary.com/dkesvcbnp/image/upload/v1761738995/Rolex_Submariner_-_Oyster_Perpetual_Date_Just_-_Rotating_Dial_-_Green_-_Silver_Chain_fmcjyb.avif">
+                                        Add to Cart
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="p-6 text-center">
+                                <h3 class="product-title text-xl font-semibold mb-2 flex items-center justify-center overflow-hidden">Rolex Submariner - Oyster Perpetual Date Just - Rotating Dial - Green - Silver Chain</h3>
+                                <div class="flex justify-center items-center gap-2">
+                                    <p class="product-price text-lg text-gray-800 font-bold">PKR 3,799.00</p>
+                                    <p class="product-original-price text-sm text-gray-500 line-through hidden"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="product-card bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden transition-all duration-300 group hover:shadow-2xl hover:-translate-y-2" data-product-id="tag-heuer-carrera-p1-1-1">
+                            <div class="image-container overflow-hidden h-72">
+                                
+                                <img src="https://res.cloudinary.com/dkesvcbnp/image/upload/v1761743172/77_rdxfk4.webp" 
+                                     alt="Tag Heuer - Carrera Calibre 5 - Off White Dial - Silver Chain" 
+                                     class="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105 img-primary">
+                                <img src="https://res.cloudinary.com/dkesvcbnp/image/upload/v1761753618/Tag_Heuer_-_Carrera_Calibre_5_-_Off_White_Dial_-_Silver_Chain_2_pwbwwl.webp" 
+                                     alt="Tag Heuer alternate view" 
+                                     class="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105 img-secondary">
+                                
+                                <button class="wishlist-icon p-2 rounded-full shadow-md hover:bg-gray-100 transition-colors bg-white" aria-label="Add to Wishlist" data-product-id="tag-heuer-carrera-p1-1-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" />
+                                    </svg>
+                                </button>
+                                
+                                <div class="hover-overlay">
+                                    <a href="#" class="quick-view-btn w-full bg-white text-black text-center py-2.5 px-4 rounded-lg font-semibold hover:bg-gray-200 transition-colors duration-300">
+                                        Quick View
+                                    </a>
+                                    <a href="#" class="add-to-cart-btn w-full bg-black text-white text-center py-2.5 px-4 rounded-lg font-semibold hover:bg-gray-800 transition-colors duration-300"
+                                       data-product-id="tag-heuer-carrera-p1" data-title="Tag Heuer - Carrera Calibre 5 - Off White Dial - Silver Chain" data-price="PKR 3,799.00" data-img-src="https://res.cloudinary.com/dkesvcbnp/image/upload/v1761743172/77_rdxfk4.webp">
+                                        Add to Cart
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="p-6 text-center">
+                                <h3 class="product-title text-xl font-semibold mb-2 flex items-center justify-center overflow-hidden">Tag Heuer - Carrera Calibre 5 - Off White Dial - Silver Chain</h3>
+                                <div class="flex justify-center items-center gap-2">
+                                    <p class="product-price text-lg text-gray-800 font-bold">PKR 3,799.00</p>
+                                    <p class="product-original-price text-sm text-gray-500 line-through hidden"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="product-card bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden transition-all duration-300 group hover:shadow-2xl hover:-translate-y-2" data-product-id="hublot-aerofusion-p1-1-2">
+                            <div class="image-container overflow-hidden h-72">
+                                
+                                <img src="https://res.cloudinary.com/dkesvcbnp/image/upload/v1761743183/53_fwgdzk.webp" 
+                                     alt="Hublot Aerofusion Chronograph - Black Dial - Diamond Cut" 
+                                     class="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105 img-primary">
+                                <img src="https://res.cloudinary.com/dkesvcbnp/image/upload/v1761753610/Hublot_Aerofusion_Chronograph_-_Black_Dial_-_Diamond_Cut_3_udb8mc.webp" 
+                                     alt="Hublot Aerofusion alternate view" 
+                                     class="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105 img-secondary">
+                                
+                                <button class="wishlist-icon p-2 rounded-full shadow-md hover:bg-gray-100 transition-colors bg-white" aria-label="Add to Wishlist" data-product-id="hublot-aerofusion-p1-1-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" />
+                                    </svg>
+                                </button>
+                                
+                                <div class="hover-overlay">
+                                    <a href="#" class="quick-view-btn w-full bg-white text-black text-center py-2.5 px-4 rounded-lg font-semibold hover:bg-gray-200 transition-colors duration-300">
+                                        Quick View
+                                    </a>
+                                    <a href="#" class="add-to-cart-btn w-full bg-black text-white text-center py-2.5 px-4 rounded-lg font-semibold hover:bg-gray-800 transition-colors duration-300"
+                                       data-product-id="hublot-aerofusion-p1" data-title="Hublot Aerofusion Chronograph - Black Dial - Diamond Cut" data-price="PKR 3,799.00" data-img-src="https://res.cloudinary.com/dkesvcbnp/image/upload/v1761743183/53_fwgdzk.webp">
+                                        Add to Cart
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="p-6 text-center">
+                                <h3 class="product-title text-xl font-semibold mb-2 flex items-center justify-center overflow-hidden">Hublot Aerofusion Chronograph - Black Dial - Diamond Cut</h3>
+                                <div class="flex justify-center items-center gap-2">
+                                    <p class="product-price text-lg text-gray-800 font-bold">PKR 3,799.00</p>
+                                    <p class="product-original-price text-sm text-gray-500 line-through hidden"></p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                    </div>
+
+                    <div class="text-center mt-16">
+                        <button id="view-more-btn" class="bg-black text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-gray-800 transition-all duration-300">
+                            View More
+                        </button>
+                    </div>
+
+                </div>
+            </section>
+
+            <section id="about" class="bg-gray-100 py-20"> <div class="container mx-auto px-6">
+                    <h2 class="text-3xl md:text-4xl font-bold text-center mb-16">
+                        Why Choose Us?
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
+                        
+                        <div class="flex flex-col items-center">
+                            <div class="bg-black text-white rounded-full p-5 mb-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path d="M9 17a2 2 0 11-4 0 2 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 2 0 014 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2-2h8z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2-2h8zM21 16V6a1 1 0 00-1-1h-1m1 11l-2-2m-2-7h-7m11 0h.01" />
+                                </svg>
+                            </div>
+                            <h3 class="text-xl font-semibold mb-2">Free Shipping</h3>
+                            <p class="text-gray-700">Enjoy free shipping on all orders nationwide.</p>
+                        </div>
+                        
+                        <div class="flex flex-col items-center">
+                            <div class="bg-black text-white rounded-full p-5 mb-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                </svg>
+                            </div>
+                            <h3 class="text-xl font-semibold mb-2">Secure Payments</h3>
+                            <p class="text-gray-700">Your payments are 100% secure and encrypted.</p>
+                        </div>
+                        
+                        <div class="flex flex-col items-center">
+                            <div class="bg-black text-white rounded-full p-5 mb-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                                </svg>
+                            </div>
+                            <h3 class="text-xl font-semibold mb-2">Premium Quality</h3>
+                            <p class="text-gray-700">Crafted from only the finest materials available.</p>
+                        </div>
+                        
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="py-24 bg-gray-100"> <div class="container mx-auto px-6 max-w-3xl">
+                    <h2 class="text-3xl md:text-4xl font-bold text-center mb-16">
+                        Frequently Asked Questions
+                    </h2>
+                    
+                    <div id="faq-container" class="space-y-4">
+                        
+                        <div class="faq-item border border-gray-200 rounded-lg overflow-hidden bg-white"> <button class="faq-toggle flex justify-between items-center w-full p-5 text-left bg-white hover:bg-gray-50 focus:outline-none"> <span class="text-lg font-semibold text-gray-800">1. How long does delivery take?</span>
+                                <span class="faq-icon text-gray-500">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                </span>
+                            </button>
+                            <div class="faq-answer px-5 text-gray-700 leading-relaxed">
+                                <p>Delivery usually takes:</p>
+                                <ul class="list-disc list-outside pl-5 space-y-1 mt-2">
+                                    <li>2–4 business days in major cities</li>
+                                    <li>4–7 business days in other areas across Pakistan</li>
+                                </ul>
+                                <p class="mt-2">You’ll receive a tracking number once your order has been shipped.</p>
+                            </div>
+                        </div>
+
+                        <div class="faq-item border border-gray-200 rounded-lg overflow-hidden bg-white"> <button class="faq-toggle flex justify-between items-center w-full p-5 text-left bg-white hover:bg-gray-50 focus:outline-none"> <span class="text-lg font-semibold text-gray-800">2. Do you offer free shipping?</span>
+                                <span class="faq-icon text-gray-500">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                </span>
+                            </button>
+                            <div class="faq-answer px-5 text-gray-700 leading-relaxed">
+                                <p>Yes! Shipping is completely free on all orders across Pakistan.</p>
+                                <p class="mt-2">There are no hidden fees or minimum purchase limits.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="faq-item border border-gray-200 rounded-lg overflow-hidden bg-white"> <button class="faq-toggle flex justify-between items-center w-full p-5 text-left bg-white hover:bg-gray-50 focus:outline-none"> <span class="text-lg font-semibold text-gray-800">3. What is Open-Box Delivery?</span>
+                                <span class="faq-icon text-gray-500">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                </span>
+                            </button>
+                            <div class="faq-answer px-5 text-gray-700 leading-relaxed">
+                                <p>Open-Box Delivery allows you to check your product in front of the delivery agent before accepting it.</p>
+                                <p class="mt-2">If you notice scratches or damage, do not accept the parcel and contact us immediately.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="faq-item border border-gray-200 rounded-lg overflow-hidden bg-white"> <button class="faq-toggle flex justify-between items-center w-full p-5 text-left bg-white hover:bg-gray-50 focus:outline-none"> <span class="text-lg font-semibold text-gray-800">4. What payment methods do you accept?</span>
+                                <span class="faq-icon text-gray-500">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                </span>
+                            </button>
+                            <div class="faq-answer px-5 text-gray-700 leading-relaxed">
+                                <p>We currently accept:</p>
+                                <ul class="list-disc list-outside pl-5 space-y-1 mt-2">
+                                    <li>Cash on Delivery (COD)</li>
+                                    <li>Bank Transfer</li>
+                                    <li>Easypaisa / JazzCash (where available)</li>
+                                </ul>
+                                <p class="mt-2">All payment methods are 100% secure.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="faq-item border border-gray-200 rounded-lg overflow-hidden bg-white"> <button class="faq-toggle flex justify-between items-center w-full p-5 text-left bg-white hover:bg-gray-50 focus:outline-none"> <span class="text-lg font-semibold text-gray-800">5. How can I track my order?</span>
+                                <span class="faq-icon text-gray-500">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                </span>
+                            </button>
+                            <div class="faq-answer px-5 text-gray-700 leading-relaxed">
+                                <p>Once your order is shipped, we’ll send you a tracking number by email or SMS.</p>
+                                <p class="mt-2">You can use it to track your order directly on the courier’s website.</p>
+                            </div>
+                        </div>
+
+                        <div class="faq-item border border-gray-200 rounded-lg overflow-hidden bg-white"> <button class="faq-toggle flex justify-between items-center w-full p-5 text-left bg-white hover:bg-gray-50 focus:outline-none"> <span class="text-lg font-semibold text-gray-800">6. What is your return policy?</span>
+                                <span class="faq-icon text-gray-500">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                </span>
+                            </button>
+                            <div class="faq-answer px-5 text-gray-700 leading-relaxed">
+                                <p>We offer a 30-day return warranty on all eligible products.</p>
+                                <p class="mt-2">To qualify, items must be unused, in their original packaging, and returned within 30 days of delivery.</p>
+                                <p class="mt-2">If the product is scratched or damaged upon delivery, please do not accept the parcel.</p>
+                            </div>
+                        </div>
+
+                        <div class="faq-item border border-gray-200 rounded-lg overflow-hidden bg-white"> <button class="faq-toggle flex justify-between items-center w-full p-5 text-left bg-white hover:bg-gray-50 focus:outline-none"> <span class="text-lg font-semibold text-gray-800">7. Can I cancel my order?</span>
+                                <span class="faq-icon text-gray-500">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                </span>
+                            </button>
+                            <div class="faq-answer px-5 text-gray-700 leading-relaxed">
+                                <p>You can cancel your order before it has been shipped by contacting our support team.</p>
+                                <p class="mt-2">Once shipped, the order cannot be canceled, but you may request a return after delivery if eligible.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="faq-item border border-gray-200 rounded-lg overflow-hidden bg-white"> <button class="faq-toggle flex justify-between items-center w-full p-5 text-left bg-white hover:bg-gray-50 focus:outline-none"> <span class="text-lg font-semibold text-gray-800">8. Are your watches original and tested?</span>
+                                <span class="faq-icon text-gray-500">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                </span>
+                            </button>
+                            <div class="faq-answer px-5 text-gray-700 leading-relaxed">
+                                <p>Yes! Every watch at CoreTick is quality-checked, tested, and verified before shipping to ensure you receive a premium and reliable product.</p>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </section>
+            <section id="contact" class="bg-black text-white py-20">
+                <div class="container mx-auto px-6 text-center">
+                    <h2 class="text-3xl font-bold mb-4">Stay Connected</h2>
+                    <p class="text-gray-300 mb-8 max-w-lg mx-auto">Subscribe to our newsletter for the latest collections and special offers.</p>
+                    <form class="flex flex-col sm:flex-row justify-center max-w-md mx-auto">
+                        <input type="email" 
+                               placeholder="Your email address" 
+                               class="w-full sm:w-auto flex-grow px-4 py-3 rounded-lg sm:rounded-l-lg sm:rounded-r-none mb-3 sm:mb-0 text-black focus:outline-none focus:ring-2 focus:ring-white"
+                               required>
+                        <button type="submit" 
+                                class="bg-white text-black font-bold py-3 px-6 rounded-lg sm:rounded-r-lg sm:rounded-l-none hover:bg-gray-200 transition-colors duration-300">
+                            Subscribe
+                        </button>
+                    </form>
+                    
+                    <div class="mt-10 text-gray-300">
+                        <p class="mb-2">Or reach us directly:</p>
+                        <a href="mailto:coretick2@gmail.com" class="text-white font-semibold hover:underline">coretick2@gmail.com</a>
+                        <span class="mx-2 text-gray-500">|</span>
+                        <a href="https://wa.me/923213595359" target="_blank" class="text-white font-semibold hover:underline">+92 321 3595359</a>
+                    </div>
+                </div>
+            </section>
+        </div>
+        
+        <div id="all-products-page" class="hidden">
+            <section id="all-products" class="py-24 bg-gray-100"> <div class="container mx-auto px-6">
+                    <h2 class="text-3xl md:text-4xl font-bold text-center mb-16">
+                        All Watches
+                    </h2>
+                    
+                    <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                        </div>
+
+                    <nav id="pagination-controls" class="flex justify-center mt-20" aria-label="Pagination">
+                        </nav>
+
+                </div>
+            </section>
+        </div>
+        
+        <div id="wishlist-page" class="hidden">
+            <section class="py-12 bg-gray-100 min-h-screen">
+                <div class="max-w-7xl mx-auto px-6">
+                    <h1 class="text-3xl md:text-4xl font-bold text-center mb-10">
+                        Your Wishlist
+                    </h1>
+
+                    <div id="wishlist-page-container" class="bg-white rounded-lg shadow-lg p-6">
+                        <div id="wishlist-empty-msg" class="text-center py-16">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-red-300 mx-auto mb-4" fill="currentColor" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" />
+                            </svg>
+                            <h2 class="text-2xl font-semibold mb-2">Your Wishlist is Empty</h2>
+                            <p class="text-gray-600 mb-6">Start browsing to save your favorite watches!</p>
+                            <button class="continue-shopping-btn bg-black text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-gray-800 transition-all duration-300">
+                                Continue Shopping
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+        
+        <div id="return-policy-page" class="hidden">
+            <section class="py-24 bg-gray-100"> <div class="container mx-auto px-6 policy-page">
+                    <h2>CoreTick Return & Refund Policy</h2>
+                    
+                    <p class="intro">Thank you for shopping with CoreTick!</p>
+                    <p>We value your trust and want you to be completely satisfied with your purchase. Please read our Return & Refund Policy carefully before placing an order.</p>
+
+                    <h3>30-Day Return Warranty</h3>
+                    <p>We offer a 30-day return warranty from the date of delivery on all eligible products.</p>
+                    <p>To qualify for a return or replacement:</p>
+                    <ul>
+                        <li>The product must be unused, in its original packaging, and include all accessories, tags, and manuals.</li>
+                        <li>The return request must be made within 30 days of receiving your order.</li>
+                        <li>Proof of purchase (such as order confirmation or receipt) is required.</li>
+                    </ul>
+
+                    <h3>Open-Box Delivery Policy</h3>
+                    <p>At CoreTick, we provide Open-Box Delivery for your peace of mind.</p>
+                    <p>When your order is delivered:</p>
+                    <ul>
+                        <li>You may inspect the product in front of the delivery agent before accepting it.</li>
+                        <li>Ensure that the item is in perfect condition and matches your order.</li>
+                        <li>Once the product is accepted and the delivery is confirmed, it will be considered successfully delivered.</li>
+                    </ul>
+
+                    <h3>Condition Policy</h3>
+                    <p>We ensure every item is thoroughly checked before dispatch.</p>
+                    <p>However, please note:</p>
+                    <ul>
+                        <li>If the order has visible scratches or damage upon delivery, do not accept the parcel or claim the order.</li>
+                        <li>Kindly inform the delivery agent and contact our support team immediately.</li>
+                        <li>Once the product is accepted and confirmed, scratches, wear, or damage claims will not be eligible for returns or refunds.</li>
+                    </ul>
+
+                    <h3>Non-Returnable Items</h3>
+                    <p>The following items are not eligible for return:</p>
+                    <ul>
+                        <li>Products damaged due to mishandling or misuse after delivery.</li>
+                        <li>Items returned without original packaging, accessories, or documentation.</li>
+                        <li>Custom or special edition watches specifically ordered for the customer.</li>
+                    </ul>
+
+                    <h3>Refund Process</h3>
+                    <p>Once your return is received and inspected, we will notify you by email.</p>
+                    <ul>
+                        <li>If approved, a refund will be processed within 7-10 business days to your original payment method.</li>
+                        <li>Shipping fees, if applicable, are non-refundable.</li>
+                        <li>In case of an exchange, replacement items will be shipped once the returned item passes inspection.</li>
+                    </ul>
+                </div>
+            </section>
+        </div>
+
+        <div id="shipping-policy-page" class="hidden">
+            <section class="py-24 bg-gray-100"> <div class="container mx-auto px-6 policy-page">
+                    <h2>CoreTick Shipping Policy</h2>
+                    
+                    <p>At CoreTick, we aim to provide a smooth and reliable shopping experience from order to delivery. Please review our shipping terms below.</p>
+
+                    <h3>Free Shipping</h3>
+                    <p>We offer Free Shipping on all orders across Pakistan — no minimum purchase required. There are no hidden charges or extra fees at checkout. Every order you place will be delivered to your doorstep completely free of cost.</p>
+
+                    <h3>Order Processing</h3>
+                    <ul>
+                        <li>Orders are processed within 1–2 business days after payment confirmation.</li>
+                        <li>You will receive an email or SMS notification once your order has been shipped.</li>
+                        <li>Orders placed on weekends or public holidays will be processed the next working day.</li>
+                    </ul>
+
+                    <h3>Estimated Delivery Time</h3>
+                    <ul>
+                        <li>Major Cities: 2–4 business days</li>
+                        <li>Other Areas: 4–7 business days</li>
+                    </ul>
+                    <p class="mt-4">Delivery time may vary slightly depending on your location and courier operations.</p>
+
+
+                    <h3>Tracking Information</h3>
+                    <p>Once your order is shipped, a tracking number will be shared via email or SMS. You can use this tracking ID to monitor your shipment through our courier partner’s website.</p>
+                    
+                    <h3>Open-Box Delivery</h3>
+                    <p>To ensure complete satisfaction, CoreTick provides Open-Box Delivery on selected orders.</p>
+                    <p>When your parcel arrives:</p>
+                    <ul>
+                        <li>You may inspect the product in front of the delivery agent before accepting it.</li>
+                        <li>If the product appears damaged or scratched, do not accept the parcel and inform the delivery agent immediately.</li>
+                        <li>Once the order is accepted, it will be marked as successfully delivered.</li>
+                    </ul>
+
+                    <h3>Delivery Coverage</h3>
+                    <p>Currently, we deliver only within Pakistan.</p>
+                    <p>We are working to expand our services internationally in the future.</p>
+                </div>
+            </section>
+        </div>
+        
+        <div id="terms-of-service-page" class="hidden">
+            <section class="py-24 bg-gray-100">
+                <div class="container mx-auto px-6 policy-page">
+                    <h2>CoreTick – Terms of Service</h2>
+                    <p class="intro">Welcome to CoreTick!</p>
+                    <p>By accessing or purchasing from our website, you agree to the following Terms of Service. Please read them carefully before using our site.</p>
+                    
+                    <h3>1. General Information</h3>
+                    <p>CoreTick is an online watch store offering premium-quality products and accessories.</p>
+                    <p>By visiting our site and/or purchasing something from us, you engage in our “Service” and agree to be bound by these terms and policies.</p>
+                    <p>We reserve the right to update, change, or replace any part of these Terms of Service at any time. Updates will be posted on this page, and continued use of the site means you accept those changes.</p>
+                    
+                    <h3>2. Eligibility</h3>
+                    <p>By using our website, you confirm that:</p>
+                    <ul>
+                        <li>You are at least 18 years old or have parental permission to make a purchase.</li>
+                        <li>You are using the site for personal, non-commercial purposes only.</li>
+                        <li>All information you provide is accurate, complete, and up to date.</li>
+                    </ul>
+                    
+                    <h3>3. Product Information</h3>
+                    <p>We take every effort to display products accurately, including images, descriptions, and colors.</p>
+                    <p>However, actual colors may slightly vary due to monitor settings or lighting conditions.</p>
+                    <p>CoreTick reserves the right to modify or discontinue any product without notice.</p>
+                    
+                    <h3>4. Pricing & Payments</h3>
+                    <p>All prices listed on our website are in PKR (Pakistani Rupees).</p>
+                    <p>We accept Cash on Delivery (COD), Bank Transfer, and Easypaisa/JazzCash.</p>
+                    <p>Prices are subject to change without prior notice.</p>
+                    <p>CoreTick reserves the right to refuse or cancel any order for pricing errors or suspected fraudulent activity.</p>
+                    
+                    <h3>5. Shipping & Delivery</h3>
+                    <p>We provide Free Shipping across Pakistan.</p>
+                    <p>Orders are typically delivered within 2–7 business days depending on location.</p>
+                    <p>Customers will receive a tracking number once the order has been shipped.</p>
+                    <p>For Open-Box Delivery orders, please inspect the product before accepting it. If scratches or damage are found, do not accept the parcel.</p>
+                    
+                    <h3>6. Returns & Exchanges</h3>
+                    <p>We offer a 30-day return warranty for eligible products.</p>
+                    <p>To qualify, the product must be:</p>
+                    <ul>
+                        <li>Unused and in original packaging.</li>
+                        <li>Returned within 30 days of delivery.</li>
+                        <li>Not damaged or scratched upon receipt.</li>
+                    </ul>
+                    <p>If the product is accepted at delivery and later found scratched, it will not be eligible for return or refund.</p>
+                    
+                    <h3>7. Order Cancellation</h3>
+                    <p>Orders can be canceled before shipping.</p>
+                    <p>Once shipped, cancellation is not possible. However, customers may apply for a return after delivery, if eligible under the return policy.</p>
+                    
+                    <h3>8. Limitation of Liability</h3>
+                    <p>CoreTick is not responsible for any direct, indirect, incidental, or consequential damages arising from:</p>
+                    <ul>
+                        <li>Product misuse, negligence, or wear over time.</li>
+                        <li>Delays or failures caused by courier services.</li>
+                        <li>Unauthorized use of our website or products.</li>
+                    </ul>
+                    
+                    <h3>9. Intellectual Property</h3>
+                    <p>All content on this website — including logos, text, graphics, images, and layout — is the property of CoreTick and is protected by copyright law.</p>
+                    <p>No part of this website may be copied, distributed, or used without our written permission.</p>
+                    
+                    <h3>10. Privacy & Data Protection</h3>
+                    <p>Your personal information is handled securely and confidentially.</p>
+                    <p>We do not share or sell customer data to third parties. For full details, please read our Privacy Policy.</p>
+                    
+                    <h3>11. Governing Law</h3>
+                    <p>These Terms of Service are governed by and interpreted in accordance with the laws of Pakistan.</p>
+                    <p>Any disputes will be handled under the jurisdiction of Pakistani courts.</p>
+                </div>
+            </section>
+        </div>
+        
+        <div id="product-detail-page" class="hidden">
+            <section class="py-12 bg-gray-100 min-h-screen">
+                <div class="container mx-auto px-6">
+                    <button id="detail-back-button" class="text-gray-600 hover:text-black mb-6 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                        Back to all products
+                    </button>
+
+                    <div id="detail-content" class="product-detail-container">
+                        
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            
+                            <div class="lg:sticky lg:top-24">
+                                <div class="detail-image-gallery">
+                                    <img id="detail-main-image" src="" alt="Main Product Image" class="w-full object-contain rounded-lg shadow-lg aspect-square">
+                                </div>
+                                <div id="detail-thumbnail-strip" class="detail-thumbnail-strip mt-3">
+                                    </div>
+                            </div>
+                            
+                            <div class="pt-4 lg:pt-0">
+                                <h1 id="detail-title" class="detail-page-title">Loading Product...</h1>
+                                <p id="detail-price" class="detail-page-price">PKR 0.00</p>
+                                
+                                <div class="border-t border-b border-gray-200 py-4 mb-6">
+                                    <p class="text-sm text-gray-700 font-semibold">Availability: <span id="detail-stock" class="text-green-600">In Stock</span></p>
+                                    <p class="text-sm text-gray-700 mt-1">Delivery Estimate: <span id="detail-delivery">3-5 business days</span></p>
+                                    
+                                    <!-- Social Proof Elements -->
+                                    <div class="mt-3 flex flex-col space-y-2 text-sm font-semibold text-gray-700">
+                                        <div class="flex items-center text-red-600">
+                                            <!-- Eye Icon -->
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                            <span id="social-proof-viewing">35 people are viewing this right now</span>
+                                        </div>
+                                        <div class="flex items-center text-red-600">
+                                            <!-- Fire Icon -->
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 7 9c2.31 2.31 4 4 4 4s-.69 1.69-.69 1.69a8.001 8.001 0 0110.154 0l-.657-.657z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 21.05v-2.1m0 0a2 2 0 100-4 2 2 0 000 4zm0 0a2 2 0 100-4 2 2 0 000 4z" />
+                                            </svg>
+                                            <span id="social-proof-sold">86 sold in last 16 hours</span>
+                                        </div>
+                                    </div>
+                                    <!-- End Social Proof Elements -->
+                                </div>
+                                
+                                <div class="mb-6">
+                                    <label for="detail-quantity" class="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
+                                    <div class="flex items-center w-32">
+                                        <button id="detail-qty-decrease" class="px-3 py-2 border border-gray-300 rounded-l-lg hover:bg-gray-100">-</button>
+                                        <input id="detail-quantity" type="text" value="1" class="w-12 text-center border-t border-b border-gray-300 py-2 bg-white" readonly>
+                                        <button id="detail-qty-increase" class="px-3 py-2 border border-gray-300 rounded-r-lg hover:bg-gray-100">+</button>
+                                    </div>
+                                </div>
+                                
+                                <button id="detail-add-to-cart" class="w-full bg-black text-white font-bold py-3 px-6 rounded-lg text-lg hover:bg-gray-800 transition-colors duration-300">
+                                    Add to Cart
+                                </button>
+
+                                <button id="detail-buy-now" class="w-full bg-white text-black font-bold py-3 px-6 rounded-lg text-lg border border-black mt-3 hover:bg-gray-100 transition-colors duration-300">
+                                    Buy Now
+                                </button>
+                                
+                                <div class="mt-8">
+                                    <h2 class="text-xl font-semibold mb-3 border-b pb-1">Product Description</h2>
+                                    <p id="detail-description" class="detail-description"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </section>
+        </div>
+
+
+        <div id="shopping-cart-page" class="hidden">
+            <section class="py-12 bg-gray-100">
+                <div class="cart-page-container bg-white rounded-lg shadow-lg">
+                    <h1>Shopping Cart</h1>
+                    
+                    <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-8 rounded-md" role="alert">
+                        <p class="font-bold">Due to HIGH Demand, Cart Expires in: 
+                            <span id="cart-countdown-timer" class="font-mono text-lg ml-2">20m 00s</span>
+                        </p>
+                    </div>
+
+                    <div id="cart-page-items-container">
+                        <div class="cart-header-row max-md:hidden">
+                            <div class="col-span-1"></div> <div class="col-span-1">Product</div>
+                            <div class="col-span-1">Price</div>
+                            <div class="col-span-1">Quantity</div>
+                            <div class="col-span-1 text-right">Total</div>
+                        </div>
+                        
+                        </div>
+
+                    <div class="flex justify-end mt-12">
+                        <div class="w-full md:w-1/2 lg:w-1/3">
+                            <div class="flex justify-between items-center mb-4">
+                                <span class="text-xl font-semibold text-gray-800">Subtotal:</span>
+                                <span id="cart-page-subtotal" class="text-2xl font-bold text-black">PKR 0.00</span>
+                            </div>
+                            <p class="text-gray-500 text-sm mb-6">Taxes, shipping and discounts calculated at checkout.</p>
+                            <button id="cart-page-checkout-btn" class="w-full bg-black text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-800 transition-colors duration-300 text-lg">
+                                Check Out
+                            </button>
+                            <button class="continue-shopping-btn w-full text-center text-sm text-gray-600 hover:text-black mt-4 underline">
+                                Continue Shopping
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+
+        <div id="checkout-page" class="hidden">
+            <div class="flex flex-col md:flex-row min-h-screen">
+                
+                <div class="w-full md:w-3/5 bg-white py-12 px-6 md:px-16 lg:px-24">
+                    <div class="max-w-lg mx-auto">
+                        <h1 class="text-4xl font-bold mb-8">CoreTick</h1>
+                        
+                        <nav class="text-sm mb-8">
+                            <ol class="flex items-center space-x-2 text-gray-500">
+                                <li><a href="#" id="checkout-cart-link" class="hover:text-black">Cart</a></li>
+                                <li><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg></li>
+                                <li><span class="font-semibold text-black">Information / Buy Now</span></li>
+                                </ol>
+                        </nav>
+
+                        <div class="mb-6">
+                            <h2 class="text-xl font-semibold mb-4">Contact Information</h2>
+                            <input type="email" id="checkout-email" placeholder="Email" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black">
+                        </div>
+
+                        <form id="checkout-form">
+                            <div class="mb-6">
+                                <h2 class="text-xl font-semibold mb-4">Shipping Address</h2>
+                                <div class="space-y-4">
+                                    <input type="text" id="checkout-country" value="Pakistan" class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100" readonly>
+                                    <div class="flex space-x-4">
+                                        <input type="text" id="checkout-first-name" placeholder="First name" class="w-1/2 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black" required>
+                                        <input type="text" id="checkout-last-name" placeholder="Last name" class="w-1/2 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black" required>
+                                    </div>
+                                    <input type="text" id="checkout-address" placeholder="Address" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black" required>
+                                    <input type="text" id="checkout-apartment" placeholder="Apartment, suite, etc. (optional)" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black">
+                                    <div class="flex space-x-4">
+                                        <input type="text" id="checkout-city" placeholder="City" class="w-1/2 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black" required>
+                                        <input type="text" id="checkout-postal-code" placeholder="Postal code" class="w-1/2 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black" required>
+                                    </div>
+                                    <input type="tel" id="checkout-phone" placeholder="Phone" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black" required>
+                                </div>
+                            </div>
+                            
+                            <div class="flex justify-between items-center mt-8">
+                                <a href="#" id="checkout-return-cart-link" class="text-black hover:underline">&lt; Return to cart</a>
+                                <button type="submit" id="buy-now-btn" class="bg-black text-white font-bold py-4 px-8 rounded-lg hover:bg-gray-800 transition-colors">
+                                    Buy Now
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                <div class="w-full md:w-2/5 bg-gray-100 py-12 px-6 md:px-12 lg:px-16 border-l border-gray-200">
+                    <div class="max-w-md mx-auto">
+                        <div id="checkout-summary-items" class="space-y-4 border-b border-gray-300 pb-6 mb-6">
+                            </div>
+                        
+                        <div class="space-y-3">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Subtotal</span>
+                                <span id="checkout-subtotal" class="font-semibold text-black">PKR 0.00</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Shipping</span>
+                                <span class="font-semibold text-black">FREE</span>
+                            </div>
+                            <div class="flex justify-between items-center border-t border-gray-300 pt-4 mt-4">
+                                <span class="text-xl font-bold">Total</span>
+                                <span id="checkout-total" class="text-2xl font-bold text-black">PKR 0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+    </main>
+
+    <footer class="bg-gray-900 text-gray-400 py-16">
+        <div class="container mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-10">
+            
+            <div>
+                <h3 class="text-2xl font-bold text-white mb-4 uppercase">CoreTick</h3>
+                <p class="text-sm">Timeless watches, timeless style.</p>
+                <div class="flex space-x-4 mt-6">
+                    <a href="https://www.instagram.com/core_tick?igsh=c3VqNHBlY3IwanJm" target="_blank" class="hover:text-white" aria-label="Instagram"><svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07c3.252.148 4.771 1.691 4.919 4.919.058 1.265.07 1.646.07 4.85s-.012 3.584-.07 4.85c-.148 3.227-1.665 4.77-4.919 4.919-1.266.058-1.646.07-4.85.07s-3.584-.012-4.85-.07c-3.252-.148-4.771-1.691-4.919-4.919-.058-1.265-.07-1.646-.07-4.85s.012-3.584.07-4.85c.148-3.227 1.665 4.77 4.919 4.919 1.266-.057 1.646-.07 4.85-.07zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948s.014 3.667.072 4.947c.2 4.358 2.618 6.78 6.98 6.98 1.281.059 1.689.073 4.948.073s3.667-.014 4.947-.072c4.358-.2 6.78-2.618 6.98-6.98.059-1.281.073-1.689.073-4.948s-.014-3.667-.072-4.947c-.2-4.358-2.618-6.78-6.98-6.98-1.281-.059-1.689-.073-4.948-.073zM12 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.162 6.162 6.162 6.162-2.759 6.162-6.162-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4s1.791-4 4-4 4 1.79 4 4-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.44-.645 1.44-1.44s-.645-1.44-1.44-1.44z"/></svg></a>
+                    <a href="https://www.tiktok.com/@core_tick?_t=ZS-90s5Zmde4ZE&_r=1" target="_blank" class="hover:text-white" aria-label="TikTok">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M16.6 5.82s.51.5 0 0A4.7 4.7 0 0 1 15.15 8c0 .37-.02.74-.07 1.1H12.9V13.7a5 5 0 0 1-1.5 3.53A4.8 4.8 0 0 1 8 18.7a4.9 4.9 0 0 1-4.2-2.32A5 5 0 0 1 2.3 12a5 5 0 0 1 1.5-3.53A4.8 4.8 0 0 1 7.1 7a5 5 0 0 1 3.32 1.19V3.41h2.11V10.7a2.9 2.9 0 0 0 1.56 2.65 2.8 2.8 0 0 0 3.27-.4A2.9 2.9 0 0 0 18.9 10a5 5 0 0 0-2.3-4.18Z" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+            
+            <div>
+                <h4 class="text-lg font-semibold text-white mb-5">Quick Links</h4>
+                <ul class="space-y-3">
+                    <li><a href="#home" id="footer-home-link" class="hover:text-white text-sm transition-colors">Home</a></li>
+                    <li><a href="#shop" id="footer-shop-link" class="hover:text-white text-sm transition-colors">Shop</a></li>
+                    <li><a href="#about" id="footer-about-link" class="hover:text-white text-sm transition-colors">About Us</a></li>
+                </ul>
+            </div>
+            
+            <div>
+                <h4 class="text-lg font-semibold text-white mb-5">Help</h4>
+                <ul class="space-y-3">
+                    <li><a href="#faq" id="faq-link" class="hover:text-white text-sm transition-colors">FAQs</a></li>
+                    <li><a href="#shipping-policy" id="shipping-policy-link" class="hover:text-white text-sm transition-colors">Shipping Policy</a></li>
+                    <li><a href="#return-policy" id="return-policy-link" class="hover:text-white text-sm transition-colors">Return Policy</a></li>
+                    <li><a href="#terms-of-service" id="terms-of-service-link" class="hover:text-white text-sm transition-colors">Terms of Service</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <h4 class="text-lg font-semibold text-white mb-5">Contact</h4>
+                <p class="text-sm">Email: <a href="mailto:coretick2@gmail.com" class="hover:text-white hover:underline">coretick2@gmail.com</a></p>
+                <p class="text-sm mt-3">WhatsApp: <a href="https://wa.me/923213595359" target="_blank" class="hover:text-white hover:underline">+92 321 3595359</a></p>
+            </div>
+        </div>
+        
+        <div class="border-t border-gray-700 mt-12 pt-8 text-center">
+            <p class="text-sm">
+                Website Created by <a href="https://www.fiverr.com/s/xXbGZYD" target="_blank" rel="noopener noreferrer" class="font-semibold text-white hover:underline">Rare Service.</a>
+            </p>
+        </div>
+    </footer>
+
+
+    <div id="confirmation-overlay">
+        <div id="confirmation-modal">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-green-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 class="text-2xl font-bold text-black mb-3">Order Confirmed!</h3>
+            <p class="text-gray-700 mb-5" id="confirmation-message">
+                We've received your order and will contact you shortly through <span class="font-semibold" id="confirm-email-display">email</span> or phone number <span class="font-semibold" id="confirm-phone-display"></span>.
+            </p>
+            <p class="text-sm font-semibold text-gray-500">
+                Redirecting to the homepage in <span id="redirect-timer" class="text-black">5</span> seconds...
+            </p>
+        </div>
+    </div>
+    <div id="cart-overlay" class="modal-overlay">
+        <div id="cart-modal" class="modal-panel">
+            <div class="flex justify-between items-center p-4 border-b border-gray-200">
+                <h2 class="text-xl font-semibold text-gray-800">Shopping Cart</h2>
+                <button id="cart-close-btn" class="text-gray-500 hover:text-gray-800" aria-label="Close modal">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <div id="cart-items-container" class="flex-grow overflow-y-auto p-4 space-y-4">
+                <div id="cart-empty-msg" class="hidden text-center py-12">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <p class="text-gray-600">Your cart is empty.</p>
+                </div>
+            </div>
+            
+            <div class="p-4 border-t border-gray-200">
+                
+                <div id="cart-upsell-section" class="mb-4 hidden">
+                    <h4 class="font-semibold mb-2">Frequently Bought Together</h4>
+                    <div class="flex items-center gap-3 p-3 border border-gray-200 rounded-lg">
+                        <img id="upsell-img" src="https://placehold.co/80x80/f3f4f6/111111?text=Watch&font=inter" alt="Upsell" class="w-20 h-20 object-cover rounded-md">
+                        <div class="flex-1">
+                            <p id="upsell-title" class="text-sm font-medium">Upsell Product Title</p>
+                            <p id="upsell-price" class="text-sm text-red-600 font-bold">PKR 3,799.00</p>
+                        </div>
+                        <button id="add-upsell-btn" class="bg-gray-800 text-white text-sm py-2 px-3 rounded-md hover:bg-black transition-colors" data-product-id="upsell-product-id" data-title="Upsell Product Title" data-price="PKR 3,799.00" data-img-src="https://placehold.co/80x80/f3f4f6/111111?text=Watch&font=inter">Add</button>
+                    </div>
+                </div>
+                
+                <div class="flex justify-between items-center mb-4">
+                    <span class="text-lg font-semibold text-gray-800">Subtotal:</span>
+                    <span id="cart-subtotal" class="text-xl font-bold text-black">PKR 0.00</span>
+                </div>
+                
+                <div class="flex items-center mb-4">
+                    <input type="checkbox" id="cart-terms-check" class="h-4 w-4 text-black border-gray-300 rounded focus:ring-black">
+                    <label for="cart-terms-check" class="ml-2 block text-sm text-gray-700">I agree with the terms and conditions</label>
+                </div>
+                
+                <button id="cart-checkout-btn" class="w-full bg-black text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-800 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    Check Out
+                </button>
+                <button id="cart-view-cart-btn" class="w-full text-center text-sm text-gray-600 hover:text-black mt-3 underline">
+                    View Cart
+                </button>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.getElementById('menu-btn').addEventListener('click', function() {
+            var mobileMenu = document.getElementById('mobile-menu');
+            if (mobileMenu.classList.contains('hidden')) {
+                mobileMenu.classList.remove('hidden');
+            } else {
+                mobileMenu.classList.add('hidden');
+            }
+        });
+    </script>
+    
+    <script>
+        const mainContent = document.getElementById('main-content');
+        const allProductsPage = document.getElementById('all-products-page');
+        const returnPolicyPage = document.getElementById('return-policy-page');
+        const shippingPolicyPage = document.getElementById('shipping-policy-page');
+        const termsOfServicePage = document.getElementById('terms-of-service-page');
+        const shoppingCartPage = document.getElementById('shopping-cart-page');
+        const checkoutPage = document.getElementById('checkout-page');
+        const wishlistPage = document.getElementById('wishlist-page'); // NEW
+        const productDetailPage = document.getElementById('product-detail-page'); // NEW DETAIL PAGE
+
+        
+        const mobileMenu = document.getElementById('mobile-menu');
+
+        function showPage(pageName) {
+            // Hide all pages
+            mainContent.classList.add('hidden');
+            allProductsPage.classList.add('hidden');
+            returnPolicyPage.classList.add('hidden');
+            shippingPolicyPage.classList.add('hidden');
+            termsOfServicePage.classList.add('hidden');
+            shoppingCartPage.classList.add('hidden');
+            checkoutPage.classList.add('hidden');
+            wishlistPage.classList.add('hidden'); // NEW
+            productDetailPage.classList.add('hidden'); // NEW DETAIL PAGE
+            
+            // Close mobile menu if open
+            mobileMenu.classList.add('hidden');
+            
+            let scrollTarget = 0; // Default to top of page
+
+            // Show the requested page
+            if (pageName === 'home') {
+                mainContent.classList.remove('hidden');
+            } else if (pageName === 'shop') {
+                allProductsPage.classList.remove('hidden');
+            } else if (pageName === 'about') {
+                mainContent.classList.remove('hidden');
+                scrollTarget = document.getElementById('about').offsetTop;
+            } else if (pageName === 'contact') {
+                mainContent.classList.remove('hidden');
+                scrollTarget = document.getElementById('contact').offsetTop;
+            } else if (pageName === 'faq') {
+                mainContent.classList.remove('hidden');
+                scrollTarget = document.getElementById('faq').offsetTop;
+            } else if (pageName === 'return-policy') {
+                returnPolicyPage.classList.remove('hidden');
+            } else if (pageName === 'shipping-policy') {
+                shippingPolicyPage.classList.remove('hidden');
+            } else if (pageName === 'terms-of-service') {
+                termsOfServicePage.classList.remove('hidden');
+            } else if (pageName === 'cart') {
+                shoppingCartPage.classList.remove('hidden');
+            } else if (pageName === 'checkout') {
+                checkoutPage.classList.remove('hidden');
+            } else if (pageName === 'wishlist') { // NEW
+                wishlistPage.classList.remove('hidden');
+                window.wishlist.renderPage(); // Render the content when navigating
+            } else if (pageName === 'product-detail') {
+                 productDetailPage.classList.remove('hidden');
+            }
+            
+            window.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+        }
+
+        // --- Event Listeners ---
+        
+        // Header Links
+        document.getElementById('home-link-logo').addEventListener('click', function(e) { e.preventDefault(); showPage('home'); });
+        document.getElementById('home-link').addEventListener('click', function(e) { e.preventDefault(); showPage('home'); });
+        document.getElementById('shop-link').addEventListener('click', function(e) { e.preventDefault(); showPage('shop'); });
+        document.getElementById('about-link').addEventListener('click', function(e) { e.preventDefault(); showPage('about'); });
+        document.getElementById('contact-link').addEventListener('click', function(e) { e.preventDefault(); showPage('contact'); });
+        document.getElementById('wishlist-icon-btn').addEventListener('click', function(e) { e.preventDefault(); showPage('wishlist'); }); // NEW
+
+        // Hero Button
+        document.getElementById('shop-link-hero').addEventListener('click', function(e) { e.preventDefault(); showPage('shop'); });
+        
+        // "View More" Button
+        document.getElementById('view-more-btn').addEventListener('click', function(e) { e.preventDefault(); showPage('shop'); });
+        
+        // Detail Page Back Button
+        document.getElementById('detail-back-button').addEventListener('click', function(e) { e.preventDefault(); showPage('shop'); });
+
+        // Mobile Menu Links
+        document.getElementById('mobile-home-link').addEventListener('click', function(e) { e.preventDefault(); showPage('home'); });
+        document.getElementById('mobile-shop-link').addEventListener('click', function(e) { e.preventDefault(); showPage('shop'); });
+        document.getElementById('mobile-about-link').addEventListener('click', function(e) { e.preventDefault(); showPage('about'); });
+        document.getElementById('mobile-contact-link').addEventListener('click', function(e) { e.preventDefault(); showPage('contact'); });
+        
+        // Footer Links
+        document.getElementById('footer-home-link').addEventListener('click', function(e) { e.preventDefault(); showPage('home'); });
+        document.getElementById('footer-shop-link').addEventListener('click', function(e) { e.preventDefault(); showPage('shop'); });
+        document.getElementById('footer-about-link').addEventListener('click', function(e) { e.preventDefault(); showPage('about'); });
+        document.getElementById('faq-link').addEventListener('click', function(e) { e.preventDefault(); showPage('faq'); });
+        document.getElementById('return-policy-link').addEventListener('click', function(e) { e.preventDefault(); showPage('return-policy'); });
+        document.getElementById('shipping-policy-link').addEventListener('click', function(e) { e.preventDefault(); showPage('shipping-policy'); });
+        document.getElementById('terms-of-service-link').addEventListener('click', function(e) { e.preventDefault(); showPage('terms-of-service'); });
+    
+        // Checkout Breadcrumb Links
+        document.getElementById('checkout-cart-link').addEventListener('click', function(e) { e.preventDefault(); showPage('cart'); });
+        document.getElementById('checkout-return-cart-link').addEventListener('click', function(e) { e.preventDefault(); showPage('cart'); });
+
+    </script>
+    
+    <script id="pagination-script">
+        const productGrid = document.getElementById('product-grid');
+        const paginationControls = document.getElementById('pagination-controls');
+        const productsPerPage = 8;
+        // --- MODIFICATION: Set totalPages to 3 (removed page 4) ---
+        const totalPages = 3;
+        let currentPage = 1;
+        
+        // --- PRICE CONSTANT ---
+        const NEW_PRICE = "3,799.00"; 
+
+        // --- UPDATED PRODUCT CATALOG (Used for Page 1 and base for others) ---
+        // This array now holds the definitive image URLs and the NEW PRICE for all models.
+        const productCatalog = [
+            // 1. Rolex Submariner (Green)
+            { 
+                id: "rolex-submariner-green-p1", 
+                name: "Rolex Submariner - Oyster Perpetual Date Just - Rotating Dial - Green - Silver Chain", 
+                price: NEW_PRICE, 
+                original: null, 
+                img: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761738995/Rolex_Submariner_-_Oyster_Perpetual_Date_Just_-_Rotating_Dial_-_Green_-_Silver_Chain_fmcjyb.avif", 
+                img2: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761753616/Rolex_Submariner_-_Oyster_Perpetual_Date_Just_-_Rotating_Dial_-_Green_-_Silver_Chain_1_hil8sl.webp", 
+                description: "A timeless classic featuring a stunning green dial and bezel, housed in a durable stainless steel Oyster case. Perfect for both diving and formal wear. Water-resistant up to 300 meters."
+            },
+            // 2. Tag Heuer Carrera (Off White)
+            { 
+                id: "tag-heuer-carrera-p1", 
+                name: "Tag Heuer - Carrera Calibre 5 - Off White Dial - Silver Chain", 
+                price: NEW_PRICE, 
+                original: null, 
+                img: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761743172/77_rdxfk4.webp", 
+                img2: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761753618/Tag_Heuer_-_Carrera_Calibre_5_-_Off_White_Dial_-_Silver_Chain_2_pwbwwl.webp", 
+                description: "The Carrera Calibre 5 offers everyday elegance with a sophisticated off-white dial and day-date window. Features a Swiss automatic movement and a polished steel bracelet for a comfortable fit."
+            }, 
+            // 3. Hublot Aerofusion (Black)
+            { 
+                id: "hublot-aerofusion-p1", 
+                name: "Hublot Aerofusion Chronograph - Black Dial - Diamond Cut", 
+                price: NEW_PRICE, 
+                original: null, 
+                img: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761743183/53_fwgdzk.webp", 
+                img2: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761753610/Hublot_Aerofusion_Chronograph_-_Black_Dial_-_Diamond_Cut_3_udb8mc.webp", 
+                description: "A bold, modern chronograph featuring a distinctive skeletonized black dial showcasing the intricate mechanics. The diamond-cut stainless steel case provides a luxurious, high-contrast finish."
+            },
+            // 4. Audemars Piguet AP (Blue) - UPDATED
+            { 
+                id: "audemars-piquet-blue-p1", 
+                name: "Audemars Piguet AP - Royal Oak - Blue Dial - Silver Chain", 
+                price: NEW_PRICE, 
+                original: null, 
+                img: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761744813/Audemars_Piguet_AP_-_Royal_Oak_-_Blue_Dial_-_Silver_Chain_hzzoqm.webp", 
+                img2: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761753609/Audemars_Piguet_AP_-_Royal_Oak_-_Blue_Dial_-_Silver_Chain_4_mcvup6.webp", 
+                description: "The iconic Royal Oak design with its signature octagonal bezel and integrated bracelet. Features a deep blue 'Grande Tapisserie' dial, epitomizing luxury sports watches."
+            }, 
+            // 5. Rolex Submariner (Black) - UPDATED
+            { 
+                id: "rolex-submariner-black-p1", 
+                name: "Rolex Submariner - Oyster Perpetual Date Just - Rotating Dial - Black - Silver Chain", 
+                price: NEW_PRICE, 
+                original: null, 
+                img: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761744813/Rolex_Submariner_-_Oyster_Perpetual_Date_Just_-_Rotating_Dial_-_Black_-_Silver_Chain_gjhfb4.webp", 
+                img2: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761753616/Rolex_Submariner_-_Oyster_Perpetual_Date_Just_-_Rotating_Dial_-_Black_-_Silver_Chain_5_pgmef6.webp", 
+                description: "The classic Submariner in black, offering unparalleled durability and timeless aesthetics. Features a black rotating bezel and luminescent markers for visibility in low light."
+            }, 
+            // 6. Patek Phillippe Nautilus (Tiffany) - UPDATED
+            { 
+                id: "patek-phillippe-tiffany-p1", 
+                name: "Patek Phillippe Nautilus Silver Watch - Tiffany Blue Dial - Silver Chain", 
+                price: NEW_PRICE, 
+                original: null, 
+                img: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761744812/Patek_Phillippe_Nautilus_Silver_Watch_-_Tiffany_Blue_Dial_-_Silver_Chain_wlzse4.webp", 
+                img2: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761753610/Patek_Phillippe_Nautilus_Silver_Watch_-_Tiffany_Blue_Dial_-_Silver_Chain_6_v77c9r.webp", 
+                description: "An iconic luxury sports watch known for its distinctive porthole construction and horizontal embossed dial in the highly sought-after Tiffany Blue colorway. A true statement piece."
+            }, 
+            // 7. Tissot Gentlemen (Blue) - UPDATED
+            { 
+                id: "tissot-gentlemen-p1", 
+                name: "Tissot - Gentlemen Series - Powermatic 80 Silicium - Blue Dial - Silver Chain", 
+                price: NEW_PRICE, 
+                original: null, 
+                img: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761744814/Tissot_-_Gentlemen_Series_-_Powermatic_80_Silicium_-_Blue_Dial_-_Silver_Chain_izi4ls.webp", 
+                img2: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761753618/Tissot_-_Gentlemen_Series_-_Powermatic_80_Silicium_-_Blue_Dial_-_Silver_Chain_7_kejjmh.webp", 
+                description: "A versatile watch featuring the Powermatic 80 automatic movement with a silicon balance spring for superior accuracy. Its clean blue dial offers sophisticated minimalism for any occasion."
+            }, 
+            // 8. Audemars Piguet AP (Beige) - UPDATED
+            { 
+                id: "audemars-piquet-beige-p1", 
+                name: "Audemars Piguet AP - Royal Oak - Beige Dial - Two Tone Chain", 
+                price: NEW_PRICE, 
+                original: null, 
+                img: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761744812/Audemars_Piguet_AP_-_Royal_Oak_-_Beige_Dial_-_Two_Tone_Chain_dlvnhb.webp", 
+                img2: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761753608/Audemars_Piguet_AP_-_Royal_Oak_-_Beige_Dial_-_Two_Tone_Chain_8_zdtkti.webp", 
+                description: "A striking two-tone version of the Royal Oak, combining stainless steel and gold accents with a warm beige dial. Features automatic movement and a glare-proof sapphire crystal."
+            },
+        ];
+        // --- END OF UPDATED CATALOG ---
+
+        // --- Specific names for Page 2 (from previous instruction) ---
+        const productNamesPage2 = [
+            "Tag Heuer - Carrera Calibre 5 - Black Dial - Silver Chain",
+            "Audemars Piguet AP - Royal Oak - Black Dial - Silver Chain",
+            "Tissot - Gentlemen Series - Powermatic 80 Silicium - Blue Dial - Two Tone Chain",
+            "Audemars Piguet AP - Royal Oak - Off White Dial - Silver Chain",
+            "Tissot - Gentlemen Series - Powermatic 80 Silicium - Black Dial - Two Tone Chain",
+            "Tissot - Gentlemen Series - Powermatic 80 Silicium - Ice Blue Dial - Two Tone Chain",
+            "Hublot - Classic Fusion - Black Dial - Diamond Cut",
+            "Hublot - Classic Fusion - Beige Dial - Diamond Cut"
+        ];
+        
+        // --- SPECIFIC IMAGE URLS FOR PAGE 2 ONLY ---
+        const productImagesPage2 = [
+            // 1. Tag Heuer - Carrera Calibre 5 - Black Dial - Silver Chain
+            "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761750142/Tag_Heuer_-_Carrera_Calibre_5_-_Black_Dial_-_Silver_Chain_l7kd00.webp",
+            // 2. Audemars Piguet AP - Royal Oak - Black Dial - Silver Chain
+            "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761750142/Audemars_Piguet_AP_-_Royal_Oak_-_Black_Dial_-_Silver_Chain_g338vw.webp",
+            // 3. Tissot - Gentlemen Series - Powermatic 80 Silicium - Blue Dial - Two Tone Chain
+            "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761750199/Tissot_-_Gentlemen_Series_-_Powermatic_80_Silicium_-_Ice_Blue_Dial_-_Two_Tone_Chain_fg4uii.webp",
+            // 4. Audemars Piguet AP - Royal Oak - Off White Dial - Silver Chain
+            "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761750141/Audemars_Piguet_AP_-_Royal_Oak_-_Off_White_Dial_-_Silver_Chain_uslpgv.webp",
+            // 5. Tissot - Gentlemen Series - Powermatic 80 Silicium - Black Dial - Two Tone Chain
+            "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761750143/Tissot_-_Gentlemen_Series_-_Powermatic_80_Silicium_-_Black_Dial_-_Two_Tone_Chain_wakhu9.webp",
+            // 6. Tissot - Gentlemen Series - Powermatic 80 Silicium - Ice Blue Dial - Two Tone Chain (Repeated image as per user request)
+            "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761750199/Tissot_-_Gentlemen_Series_-_Powermatic_80_Silicium_-_Ice_Blue_Dial_-_Two_Tone_Chain_fg4uii.webp",
+            // 7. Hublot - Classic Fusion - Black Dial - Diamond Cut
+            "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761750142/Hublot_-_Classic_Fusion_-_Black_Dial_-_Diamond_Cut_gtzqfs.webp",
+            // 8. Hublot - Classic Fusion - Beige Dial - Diamond Cut
+            "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761750142/Hublot_-_Classic_Fusion_-_Beige_Dial_-_Diamond_Cut_d9magc.webp"
+        ];
+        
+        // --- MODIFIED: Specific names for Page 3 (7 items remaining after edits) ---
+        const productNamesPage3 = [
+            "Patek Philippe Cubitus Collection - Black Dial - Silver Chain", // Replaced Rolex Submariner (Green)
+            "Hublot - Beige Dial", // Replaced Tag Heuer (Off White)
+            "Rolex Oyster Perpetual Date Just - Fluted Bezel - Black - Silver Chain", // Replaced Hublot Aerofusion Chronograph
+            "Rolex Oyster Perpetual Date Just - Gold Dial - Silver Chain Two Tone", // Replaced Audemars Piguet AP (Blue)
+            "Tissot 1853 - Black Dial - Silver Chain", // Replaced Tag Heuer (Black)
+            "Villantto - BLVCK Arabic Watch - Stainless Steel Edition", // Replaced Audemars Piguet AP (Black)
+            "Hublot - Blue Dial" // Replaced Tissot (Blue) - Last item (Index 6)
+            // Removed: Audemars Piguet AP - Royal Oak - Off White Dial - Silver Chain (Index 7)
+        ];
+
+        // --- NEW: SPECIFIC IMAGE URLS FOR PAGE 3 ONLY ---
+        const productImagesPage3 = [
+            // 1. Patek Philippe Cubitus Collection - Black Dial - Silver Chain
+            { 
+                img: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761815729/Patek_Philippe_Cubitus_Collection_-_Black_Dial_-_Silver_Chain_1_omhbgv.webp", 
+                img2: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761815728/Patek_Philippe_Cubitus_Collection_-_Black_Dial_-_Silver_Chain_1_secondary_image_idgwjf.webp"
+            },
+            // 2. Hublot - Beige Dial
+            { 
+                img: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761815726/Hublot_-_Beige_Dial_2_re5lvp.webp", 
+                img2: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761815726/Hublot_-_Beige_Dial_2_secondary_image_vifnij.webp"
+            },
+            // 3. Rolex Oyster Perpetual Date Just - Fluted Bezel - Black - Silver Chain
+            { 
+                img: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761815741/Rolex_Oyster_Perpetual_Date_Just_-_Fluted_Bezel_-_Black_-_Silver_Chain_3_otzox2.webp", 
+                img2: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761815744/Rolex_Oyster_Perpetual_Date_Just_-_Fluted_Bezel_-_Black_-_Silver_Chain_3_secondary_image_zpzrsc.webp"
+            },
+            // 4. Rolex Oyster Perpetual Date Just - Gold Dial - Silver Chain Two Tone
+            { 
+                img: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761815740/Rolex_Oyster_Perpetual_Date_Just_-_Gold_Dial_-_Silver_Chain_Two_Tone_1_inic3r.webp", 
+                img2: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761815739/Rolex_Oyster_Perpetual_Date_Just_-_Gold_Dial_-_Silver_Chain_Two_Tone_1_secondary_imaage_aa7ehh.webp"
+            },
+            // 5. Tissot 1853 - Black Dial - Silver Chain
+            { 
+                img: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761815744/Tissot_1853_-_Black_Dial_-_Silver_Chain_5_hwsprb.webp", 
+                img2: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761815741/Tissot_1853_-_Black_Dial_-_Silver_Chain_5_secondary_image_ndegbk.webp"
+            },
+            // 6. Villantto - BLVCK Arabic Watch - Stainless Steel Edition
+            { 
+                img: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761815753/Villantto_-_BLVCK_Arabic_Watch_-_Stainless_Steel_Edition_6_coih86.webp", 
+                img2: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761815750/Villantto_-_BLVCK_Arabic_Watch_-_Stainless_Steel_Edition_6_secondary_image_kopf4i.webp"
+            },
+            // 7. Hublot - Blue Dial
+            { 
+                img: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761815732/Hublot_-_Blue_Dial_7_rurnu6.webp", 
+                img2: "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761815726/Hublot_-_Blue_Dial_7_secondary_image_c3x7xf.webp"
+            },
+        ];
+        
+        // --- SPECIFIC IMAGE URLS FOR PAGE 1 SECONDARY HOVER IMAGES (img2) ---
+        const productImagesPage1_img2 = [
+            "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761753616/Rolex_Submariner_-_Oyster_Perpetual_Date_Just_-_Rotating_Dial_-_Green_-_Silver_Chain_1_hil8sl.webp",
+            "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761753618/Tag_Heuer_-_Carrera_Calibre_5_-_Off_White_Dial_-_Silver_Chain_2_pwbwwl.webp",
+            "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761753610/Hublot_Aerofusion_Chronograph_-_Black_Dial_-_Diamond_Cut_3_udb8mc.webp", 
+            "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761753609/Audemars_Piguet_AP_-_Royal_Oak_-_Blue_Dial_-_Silver_Chain_4_mcvup6.webp",
+            "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761753616/Rolex_Submariner_-_Oyster_Perpetual_Date_Just_-_Rotating_Dial_-_Black_-_Silver_Chain_5_pgmef6.webp",
+            "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761753610/Patek_Phillippe_Nautilus_Silver_Watch_-_Tiffany_Blue_Dial_-_Silver_Chain_6_v77c9r.webp",
+            "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761753618/Tissot_-_Gentlemen_Series_-_Powermatic_80_Silicium_-_Blue_Dial_-_Silver_Chain_7_kejjmh.webp",
+            "https://res.cloudinary.com/dkesvcbnp/image/upload/v1761753608/Audemars_Piguet_AP_-_Royal_Oak_-_Beige_Dial_-_Two_Tone_Chain_8_zdtkti.webp"
+        ];
+        
+
+        // This function generates products for a given page.
+        function getProductsForPage(pageNumber) {
+            const products = [];
+            
+            // Determine which array of names to use for this page
+            let currentNames = productCatalog.map(p => p.name); // Default to catalog names
+            let currentProductsPerPage = productsPerPage; // Default to 8
+            
+            if (pageNumber === 2) {
+                currentNames = productNamesPage2;
+            } else if (pageNumber === 3) {
+                currentNames = productNamesPage3;
+                currentProductsPerPage = currentNames.length; // Set to 7 for page 3
+            } 
+            // Removed Page 4 logic
+
+            // Iterate through the determined names or catalog template
+            for (let i = 0; i < currentProductsPerPage; i++) {
+                const catalogIndex = i % productCatalog.length;
+                const productTemplate = productCatalog[catalogIndex];
+                
+                const productName = currentNames[i] || `${productTemplate.name} P${pageNumber} (Placeholder)`;
+                
+                let imgSource = productTemplate.img;
+                let img2Source;
+
+                if (pageNumber === 1) {
+                    // Page 1: Use the permanent Cloudinary URLs defined in the productCatalog array for img1
+                    imgSource = productCatalog[catalogIndex].img;
+                    // Page 1: Use the new specific secondary images for img2
+                    img2Source = productImagesPage1_img2[catalogIndex];
+                } else if (pageNumber === 2) {
+                    // Page 2: Use the specific Cloudinary URLs defined in productImagesPage2 for img1
+                    imgSource = productImagesPage2[i]; 
+                    // Page 2: Use the secondary image from Page 1's secondary image list
+                    img2Source = productImagesPage1_img2[i];
+                } else if (pageNumber === 3) { // MODIFIED: Use the new Page 3 Image Array
+                    imgSource = productImagesPage3[i].img;
+                    img2Source = productImagesPage3[i].img2;
+                } else {
+                    // Default fallback logic
+                    imgSource = `https://placehold.co/600x600/f3f4f6/111111?text=Watch+P${pageNumber}+M${i + 1}&font=inter`;
+                    img2Source = `https://placehold.co/600x600/e0e0e0/333333?text=Watch+P${pageNumber}+View+2&font=inter`;
+                }
+                
+                // Find the base product in the catalog to get the consistent price and description
+                let price = NEW_PRICE; // Use the new constant price
+                let description = productTemplate.description;
+                
+                // If a product has a matching ID in the main catalog, pull its description
+                if (pageNumber !== 1) {
+                    const baseProduct = productCatalog.find(p => productName.includes(p.name.split(' - ')[0]) || p.id.includes(productName.split(' - ')[0].toLowerCase()));
+                    if (baseProduct) {
+                        description = baseProduct.description;
+                    }
+                }
+                
+
+                products.push({
+                    ...productTemplate,
+                    id: `${productTemplate.id}-p${pageNumber}-${i}`, // Ensure unique ID per page/position
+                    name: productName,
+                    price: price, // Use the new price
+                    original: productTemplate.original,
+                    img: imgSource,
+                    img2: img2Source,
+                    // Use the dedicated description from the catalog if available, otherwise use a default one
+                    description: description || `This is the default description for the ${productName}. It features premium craftsmanship and high-quality materials, offering excellent value and style.`,
+                });
+            }
+            return products;
+        }
+
+        // Function to update the product grid for the current page
+        function updateProductGrid(pageNumber) {
+            currentPage = pageNumber;
+            productGrid.innerHTML = ''; // Clear existing products
+            
+            const products = getProductsForPage(pageNumber);
+            
+            products.forEach(product => {
+                // Check if item is in wishlist to set the initial heart color
+                const isWished = window.wishlist.items.some(item => item.id === product.id); 
+                
+                // MODIFIED: Removed conditional for originalPriceHTML and set price color to gray-800
+                const originalPriceHTML = ''; // Disabling line-through price
+                const priceColorClass = 'text-gray-800';
+
+
+                const productCardHTML = `
+                <div class="product-card bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden transition-all duration-300 group hover:shadow-2xl hover:-translate-y-2 animate-fadeInUp" data-product-id="${product.id}">
+                    <div class="image-container overflow-hidden h-72">
+                        <img src="${product.img}" 
+                             alt="${product.name}" 
+                             class="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105 img-primary">
+                        <img src="${product.img2}" 
+                             alt="${product.name} alternate view" 
+                             class="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105 img-secondary">
+                        
+                        <button class="wishlist-icon p-2 rounded-full shadow-md hover:bg-gray-100 transition-colors bg-white ${isWished ? 'active' : ''}" aria-label="Add to Wishlist" data-product-id="${product.id}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" />
+                            </svg>
+                        </button>
+                        
+                        <div class="hover-overlay">
+                            <a href="#" class="quick-view-btn w-full bg-white text-black text-center py-2.5 px-4 rounded-lg font-semibold hover:bg-gray-200 transition-colors duration-300" data-product-id="${product.id}">
+                                Quick View
+                            </a>
+                            <a href="#" class="add-to-cart-btn w-full bg-black text-white text-center py-2.5 px-4 rounded-lg font-semibold hover:bg-gray-800 transition-colors duration-300" data-product-id="${product.id}" data-title="${product.name}" data-price="PKR ${product.price}" data-img-src="${product.img}">
+                                Add to Cart
+                            </a>
+                        </div>
+                    </div>
+                    <div class="p-6 text-center">
+                        <h3 class="product-title text-xl font-semibold mb-2 flex items-center justify-center overflow-hidden">${product.name}</h3>
+                        <div class="flex justify-center items-baseline gap-2">
+                            <p class="product-price text-lg ${priceColorClass} font-bold">PKR ${product.price}</p>
+                            ${originalPriceHTML}
+                        </div>
+                    </div>
+                </div>`;
+                productGrid.innerHTML += productCardHTML;
+            });
+            
+            // After rendering, re-attach wishlist click listeners
+            attachWishlistListeners();
+            // Re-attach quick view listeners which now trigger the detail page
+            attachQuickViewListeners();
+        }
+        
+        // --- NEW: Function to attach quick view listeners to dynamically created elements ---
+        function attachQuickViewListeners() {
+            document.querySelectorAll('.product-card .quick-view-btn').forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const card = this.closest('.product-card');
+                    const productId = card.dataset.productId;
+                    if (productId) {
+                        openProductDetailPage(productId);
+                    }
+                });
+            });
+        }
+        
+        // --- Detail Page Logic ---
+        function openProductDetailPage(productId) {
+            // Find the product across all pages
+            let productData = null;
+            
+            // 1. Check Page 1 products (from productCatalog)
+            // Note: Featured product IDs include `-p1-1-X` suffixes. We match them to the base ID.
+            const baseIdMatch = productId.match(/([a-z0-9-]+-p1)/);
+            const baseId = baseIdMatch ? baseIdMatch[1] : productId;
+
+            productData = productCatalog.find(p => p.id === baseId);
+
+            // 2. If not found, check all pages (requires iterating through generated products)
+            if (!productData) {
+                // Modified loop limit to totalPages (now 3)
+                for (let p = 1; p <= totalPages; p++) {
+                    const productsOnPage = getProductsForPage(p);
+                    productData = productsOnPage.find(p => p.id === productId);
+                    if (productData) break;
+                }
+            }
+
+            if (!productData) {
+                console.error("Product not found for ID:", productId);
+                return;
+            }
+
+            // 3. Populate Detail Page
+            document.getElementById('detail-title').textContent = productData.name;
+            document.getElementById('detail-price').textContent = `PKR ${productData.price}`;
+            document.getElementById('detail-description').textContent = productData.description;
+            
+            // 4. Handle Images
+            const mainImageEl = document.getElementById('detail-main-image');
+            const thumbnailStripEl = document.getElementById('detail-thumbnail-strip');
+            thumbnailStripEl.innerHTML = '';
+            
+            // Collect all available images
+            const images = [
+                { src: productData.img, alt: `${productData.name} - Front`, isActive: true },
+                { src: productData.img2, alt: `${productData.name} - Side`, isActive: false }
+            ];
+
+            // Set main image initially
+            mainImageEl.src = images[0].src;
+            mainImageEl.alt = images[0].alt;
+            
+            // Create thumbnails
+            images.forEach((img, index) => {
+                const thumbnail = document.createElement('img');
+                thumbnail.src = img.src;
+                thumbnail.alt = img.alt;
+                // Add a class for styling and set the initial active thumbnail
+                thumbnail.className = `object-contain rounded-md ${img.isActive ? 'active' : ''}`;
+                thumbnail.addEventListener('click', () => {
+                    mainImageEl.src = thumbnail.src;
+                    // Remove active class from all thumbnails
+                    thumbnailStripEl.querySelectorAll('img').forEach(t => t.classList.remove('active'));
+                    // Add active class to the clicked thumbnail
+                    thumbnail.classList.add('active');
+                });
+                thumbnailStripEl.appendChild(thumbnail);
+            });
+            
+            // 5. Update Cart Buttons for Detail Page
+            const detailAddToCartBtn = document.getElementById('detail-add-to-cart');
+            detailAddToCartBtn.onclick = () => {
+                const quantity = parseInt(document.getElementById('detail-quantity').value, 10);
+                window.cart.add(productData, quantity);
+                window.cart.open();
+            };
+            
+            // 6. Update Buy Now Button (simplified checkout for single item)
+            document.getElementById('detail-buy-now').onclick = () => {
+                // Clear cart and add only this item for "Buy Now" flow
+                window.cart.items = [];
+                window.cart.add(productData, parseInt(document.getElementById('detail-quantity').value, 10));
+                showPage('checkout');
+            };
+            
+            // 7. Show Page and Scroll to Top
+            showPage('product-detail');
+        }
+
+        // Quantity controls for detail page
+        document.getElementById('detail-qty-increase').addEventListener('click', () => {
+            const qtyInput = document.getElementById('detail-quantity');
+            let qty = parseInt(qtyInput.value, 10);
+            qtyInput.value = qty + 1;
+        });
+
+        document.getElementById('detail-qty-decrease').addEventListener('click', () => {
+            const qtyInput = document.getElementById('detail-quantity');
+            let qty = parseInt(qtyInput.value, 10);
+            if (qty > 1) {
+                qtyInput.value = qty - 1;
+            }
+        });
+
+
+        // --- NEW: Function to attach wishlist listeners to dynamically created elements ---
+        function attachWishlistListeners() {
+             document.querySelectorAll('.product-card .wishlist-icon').forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const productId = this.dataset.productId;
+                    if (productId) {
+                        const card = this.closest('.product-card');
+                        // Use product properties directly from data attributes set on the Add to Cart link or infer from productCatalog
+                        const product = {
+                            id: productId,
+                            name: card.querySelector('.product-title').textContent,
+                            price: card.querySelector('.product-price').textContent,
+                            original: card.querySelector('.product-original-price')?.textContent,
+                            img: card.querySelector('.img-primary').src,
+                        };
+                        window.wishlist.toggle(product);
+                    }
+                });
+            });
+        }
+
+
+        // Function to update the pagination buttons UI
+        function updatePaginationUI(activePage) {
+            paginationControls.innerHTML = ''; // Clear existing buttons
+            let paginationHTML = '<ul class="flex items-center -space-x-px h-10 text-base">';
+
+            // Previous Button
+            paginationHTML += `
+            <li>
+                <a href="#" data-page="${activePage > 1 ? activePage - 1 : 1}" class="flex items-center justify-center px-4 h-10 ms-0 leading-tight text-gray-500 bg-white border border-e-0 border-gray-300 rounded-s-lg hover:bg-gray-100 hover:text-gray-700 ${activePage === 1 ? 'pointer-events-none opacity-50' : ''}">
+                    <span class="sr-only">Previous</span>
+                    <svg class="w-3 h-3 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 6 10">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 1 1 5l4 4"/>
+                    </svg>
+                </a>
+            </li>`;
+
+            // Page Number Buttons
+            // Logic to show first, last, current, and surrounding pages
+            const pagesToShow = [];
+            // Since totalPages is 3, show 1, 2, 3
+            if (totalPages <= 7) {
+                // Show all pages
+                for (let i = 1; i <= totalPages; i++) pagesToShow.push(i);
+            } else {
+                // This block is no longer relevant since totalPages is 3
+                pagesToShow.push(1);
+                if (activePage > 3) pagesToShow.push('...');
+                
+                if (activePage <= 3) {
+                    pagesToShow.push(2, 3);
+                } else if (activePage >= totalPages - 2) {
+                    pagesToShow.push(totalPages - 2, totalPages - 1);
+                } else {
+                    pagesToShow.push(activePage - 1, activePage, activePage + 1);
+                }
+                
+                if (activePage < totalPages - 2) pagesToShow.push('...');
+                pagesToShow.push(totalPages);
+            }
+            
+            // De-duplicate array (for '...')
+            const uniquePages = [...new Set(pagesToShow)].filter(page => page <= totalPages); // Filter out pages above new limit
+
+            uniquePages.forEach(page => {
+                if (page === '...') {
+                    paginationHTML += `
+                    <li>
+                        <span class="flex items-center justify-center px-4 h-10 leading-tight text-gray-500 bg-white border border-gray-300">...</span>
+                    </li>`;
+                } else if (typeof page === 'number') {
+                    const isActive = (page === activePage);
+                    const classes = isActive ? 'pagination-active' : 'pagination-inactive';
+                    paginationHTML += `
+                    <li>
+                        <a href="#" data-page="${page}" class="flex items-center justify-center px-4 h-10 leading-tight border ${classes}">${page}</a>
+                    </li>`;
+                }
+            });
+
+            // Next Button
+            paginationHTML += `
+            <li>
+                <a href="#" data-page="${activePage < totalPages ? activePage + 1 : totalPages}" class="flex items-center justify-center px-4 h-10 leading-tight text-gray-500 bg-white border border-gray-300 rounded-e-lg hover:bg-gray-100 hover:text-gray-700 ${activePage === totalPages ? 'pointer-events-none opacity-50' : ''}">
+                    <span class="sr-only">Next</span>
+                    <svg class="w-3 h-3 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 6 10">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 9 4-4-4-4"/>
+                    </svg>
+                </a>
+            </li>`;
+            
+            paginationHTML += '</ul>';
+            paginationControls.innerHTML = paginationHTML;
+        }
+
+        // Event listener for pagination clicks
+        paginationControls.addEventListener('click', function(e) {
+            e.preventDefault();
+            const target = e.target.closest('a'); // Find the clicked link
+            
+            if (target && target.dataset.page) {
+                const pageNumber = parseInt(target.dataset.page, 10);
+                // Ensure page number does not exceed new totalPages limit
+                if (pageNumber !== currentPage && pageNumber <= totalPages) { 
+                    updateProductGrid(pageNumber);
+                    updatePaginationUI(pageNumber);
+                    // Scroll to top of product grid
+                    document.getElementById('all-products').scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+        });
+
+        // Initial load
+        // --- FIX: Ensure initial load runs immediately when page is shown ---
+        window.addEventListener('load', function() {
+            // This is crucial for the very first time the page loads, but run inside load event for safety
+            updateProductGrid(1);
+            updatePaginationUI(1);
+            // Attach listeners here since they rely on global pagination script data
+            attachQuickViewListeners();
+        });
+        // -------------------------------------------------------------------
+        
+        // --- GLOBAL FUNCTION FOR SEARCH SCRIPT ACCESS ---
+        window.getAllProducts = function() {
+            const allProducts = [];
+            for (let p = 1; p <= totalPages; p++) {
+                allProducts.push(...getProductsForPage(p));
+            }
+            return allProducts;
+        };
+    </script>
+    
+    <script>
+        const faqItems = document.querySelectorAll('.faq-item');
+
+        faqItems.forEach(item => {
+            const toggle = item.querySelector('.faq-toggle');
+            const answer = item.querySelector('.faq-answer');
+            const icon = item.querySelector('.faq-icon svg');
+            const iconContainer = item.querySelector('.faq-icon');
+
+            toggle.addEventListener('click', () => {
+                const isOpen = item.classList.contains('active');
+
+                // Close all other items
+                faqItems.forEach(otherItem => {
+                    otherItem.classList.remove('active');
+                    // Reset icon
+                    otherItem.querySelector('.faq-icon').innerHTML = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>'; // Reset to +
+                });
+
+                // If this item was not already open, open it
+                if (!isOpen) {
+                    item.classList.add('active');
+                    // Change to -
+                    iconContainer.innerHTML = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6"></path></svg>';
+                }
+            });
+        });
+    </script>
+
+    <script id="quick-view-script">
+        
+        // Event Delegation for old "Add to Cart" in featured products (FIXED: Added robust data fetching)
+        document.body.addEventListener('click', (e) => {
+            const addToCartBtn = e.target.closest('.add-to-cart-btn');
+            
+            // Only proceed if a dedicated Add to Cart button was clicked (either on card or detail page)
+            if (addToCartBtn) { 
+                e.preventDefault();
+                
+                // Fetch product data from the button's data attributes
+                const item = {
+                    id: addToCartBtn.dataset.productId,
+                    title: addToCartBtn.dataset.title,
+                    price: addToCartBtn.dataset.price,
+                    imgSrc: addToCartBtn.dataset.imgSrc
+                };
+                
+                // Determine quantity (always 1 for quick add, unless from detail page)
+                let quantity = 1;
+                // If the target button is the detail page's Add to Cart button
+                if (addToCartBtn.id === 'detail-add-to-cart') { 
+                    quantity = parseInt(document.getElementById('detail-quantity').value, 10);
+                    // Use product data from the detail page scope for consistent naming
+                    const detailTitle = document.getElementById('detail-title').textContent;
+                    const detailPrice = document.getElementById('detail-price').textContent;
+                    const detailImgSrc = document.getElementById('detail-main-image').src;
+                    
+                    // Update item properties using the fresh detail page data
+                    item.title = detailTitle;
+                    item.price = detailPrice;
+                    item.imgSrc = detailImgSrc;
+                }
+
+                // Simple validation
+                if (item.id && item.title && item.price && item.imgSrc) {
+                    window.cart.add(item, quantity);
+                    window.cart.open();
+                } else {
+                    console.error("Missing product data for Add to Cart:", item);
+                }
+            }
+        });
+        
+    </script>
+    
+    <script id="wishlist-script">
+        (function() {
+            // --- STATE ---
+            let wishlistItems = []; 
+            const WISHLIST_KEY = 'coretick_wishlist';
+            
+            // --- SELECTORS ---
+            const wishlistIconBtn = document.getElementById('wishlist-icon-btn');
+            const wishlistCountBadge = document.getElementById('wishlist-item-count-badge');
+            const wishlistPageContainer = document.getElementById('wishlist-page-container');
+            const wishlistEmptyMsg = document.getElementById('wishlist-empty-msg');
+            
+            // --- LOCAL STORAGE PERSISTENCE ---
+            function loadWishlist() {
+                const storedItems = localStorage.getItem(WISHLIST_KEY);
+                wishlistItems = storedItems ? JSON.parse(storedItems) : [];
+                updateWishlistUI();
+            }
+
+            function saveWishlist() {
+                localStorage.setItem(WISHLIST_KEY, JSON.stringify(wishlistItems));
+            }
+
+            // --- UI UPDATES ---
+            function updateWishlistUI() {
+                const count = wishlistItems.length;
+                if (count > 0) {
+                    wishlistCountBadge.textContent = count;
+                    wishlistCountBadge.classList.remove('hidden');
+                } else {
+                    wishlistCountBadge.classList.add('hidden');
+                }
+                
+                // Update heart icons on the product grid if visible
+                document.querySelectorAll('.product-card .wishlist-icon').forEach(iconButton => {
+                    const id = iconButton.dataset.productId;
+                    const isActive = wishlistItems.some(item => item.id === id);
+                    iconButton.classList.toggle('active', isActive);
+                });
+                
+                // Re-render the dedicated wishlist page if it's currently visible
+                if (!document.getElementById('wishlist-page').classList.contains('hidden')) {
+                    renderWishlistPage();
+                }
+            }
+            
+            // --- WISHLIST LOGIC ---
+            function toggleWishlist(product) {
+                const index = wishlistItems.findIndex(item => item.id === product.id);
+                
+                if (index > -1) {
+                    // Remove item
+                    wishlistItems.splice(index, 1);
+                } else {
+                    // Add item (excluding quantity and unnecessary properties)
+                    // Note: We use the price directly from the card text content here
+                    wishlistItems.push({
+                        id: product.id,
+                        name: product.name,
+                        price: product.price,
+                        original: product.original || null,
+                        img: product.img,
+                    });
+                }
+                
+                saveWishlist();
+                updateWishlistUI();
+            }
+            
+            function removeWishlistItem(id) {
+                wishlistItems = wishlistItems.filter(item => item.id !== id);
+                saveWishlist();
+                updateWishlistUI();
+            }
+
+            // --- RENDER WISHLIST PAGE ---
+            function renderWishlistPage() {
+                wishlistPageContainer.innerHTML = ''; // Clear container
+                
+                if (wishlistItems.length === 0) {
+                    // Re-append the empty message structure if it was removed
+                    if (!document.getElementById('wishlist-empty-msg')) {
+                        const emptyMsgDiv = document.createElement('div');
+                        emptyMsgDiv.id = 'wishlist-empty-msg';
+                        emptyMsgDiv.className = 'text-center py-16';
+                        emptyMsgDiv.innerHTML = `
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-red-300 mx-auto mb-4" fill="currentColor" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" />
+                            </svg>
+                            <h2 class="text-2xl font-semibold mb-2">Your Wishlist is Empty</h2>
+                            <p class="text-gray-600 mb-6">Start browsing to save your favorite watches!</p>
+                            <button class="continue-shopping-btn bg-black text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-gray-800 transition-all duration-300">
+                                Continue Shopping
+                            </button>
+                        `;
+                        wishlistPageContainer.appendChild(emptyMsgDiv);
+                    }
+                    document.getElementById('wishlist-empty-msg').classList.remove('hidden');
+                    return;
+                }
+                
+                // Hide the empty message if it exists
+                const existingEmptyMsg = document.getElementById('wishlist-empty-msg');
+                if (existingEmptyMsg) {
+                    existingEmptyMsg.classList.add('hidden');
+                }
+
+
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6';
+
+                wishlistItems.forEach(item => {
+                    // Ensure price parsing is only done if the price element exists
+                    // MODIFIED: Removing discount price visibility
+                    const originalPriceValue = null;
+                    const originalPriceHTML = '';
+                        
+                    const itemCard = document.createElement('div');
+                    itemCard.className = 'flex flex-col bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden p-4 relative group';
+                    itemCard.innerHTML = `
+                        <button class="wishlist-remove-btn absolute top-3 right-3 text-gray-400 hover:text-red-500 z-10 p-2 bg-white rounded-full transition-colors" data-id="${item.id}" aria-label="Remove from Wishlist">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                        
+                        <div class="flex flex-col items-center text-center p-2">
+                            <img src="${item.img}" alt="${item.name}" class="w-full h-48 object-cover rounded-md border border-gray-100 mb-4">
+                            <p class="font-semibold text-base mb-1">${item.name}</p>
+                            <div class="flex items-baseline gap-2 mb-4">
+                                <p class="text-lg font-bold text-gray-800">${item.price}</p>
+                                ${originalPriceHTML}
+                            </div>
+                        </div>
+                        
+                        <button class="add-to-cart-btn w-full bg-black text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors duration-300" 
+                                data-product-id="${item.id}" data-title="${item.name}" data-price="${item.price}" data-img-src="${item.img}">
+                            Add to Cart
+                        </button>
+                    `;
+                    grid.appendChild(itemCard);
+                });
+
+                wishlistPageContainer.appendChild(grid);
+                
+                // Re-attach listeners to dynamically created "Remove" buttons
+                document.querySelectorAll('.wishlist-remove-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        removeWishlistItem(btn.dataset.id);
+                        // The renderPage() call inside updateWishlistUI handles the re-render.
+                    });
+                });
+                
+                // Re-attach listeners to the 'Continue Shopping' button if it was used in the grid
+                const continueShoppingBtn = wishlistPageContainer.querySelector('.continue-shopping-btn');
+                if (continueShoppingBtn) {
+                     continueShoppingBtn.addEventListener('click', (e) => {
+                         e.preventDefault();
+                         showPage('shop');
+                     });
+                }
+            }
+
+
+            // --- GLOBAL API & INIT ---
+            window.wishlist = {
+                items: wishlistItems,
+                toggle: toggleWishlist,
+                remove: removeWishlistItem,
+                renderPage: renderWishlistPage // Function to call when navigating to the page
+            };
+            
+            // Initialize on load
+            loadWishlist();
+        })();
+    </script>
+    
+    <script id="shopping-cart-script">
+        (function() {
+            // --- STATE ---
+            let cartItems = []; // { id, title, price, imgSrc, quantity }
+            let cartTimerInterval;
+            
+            // --- SELECTORS ---
+            const cartOverlay = document.getElementById('cart-overlay');
+            const cartModal = document.getElementById('cart-modal');
+            const cartCloseBtn = document.getElementById('cart-close-btn');
+            const cartIconBtn = document.getElementById('cart-icon-btn');
+            const cartItemsContainer = document.getElementById('cart-items-container');
+            const cartEmptyMsg = document.getElementById('cart-empty-msg');
+            const cartSubtotalEl = document.getElementById('cart-subtotal');
+            const cartItemCountBadge = document.getElementById('cart-item-count-badge');
+            const cartTermsCheck = document.getElementById('cart-terms-check');
+            const cartCheckoutBtn = document.getElementById('cart-checkout-btn');
+            const cartViewCartBtn = document.getElementById('cart-view-cart-btn');
+            
+            // Upsell Elements
+            const upsellSection = document.getElementById('cart-upsell-section');
+            const addUpsellBtn = document.getElementById('add-upsell-btn');
+            
+            // Page: Shopping Cart
+            const cartPageItemsContainer = document.getElementById('cart-page-items-container');
+            const cartPageSubtotalEl = document.getElementById('cart-page-subtotal');
+            const cartPageCheckoutBtn = document.getElementById('cart-page-checkout-btn');
+            const cartPageTimerEl = document.getElementById('cart-countdown-timer');
+
+            // Page: Checkout
+            const checkoutForm = document.getElementById('checkout-form');
+            const checkoutEmail = document.getElementById('checkout-email');
+            const checkoutCountry = document.getElementById('checkout-country'); // Added missing selector
+            const checkoutFirstName = document.getElementById('checkout-first-name');
+            const checkoutLastName = document.getElementById('checkout-last-name');
+            const checkoutAddress = document.getElementById('checkout-address');
+            const checkoutApartment = document.getElementById('checkout-apartment');
+            const checkoutCity = document.getElementById('checkout-city');
+            const checkoutPostalCode = document.getElementById('checkout-postal-code');
+            const checkoutPhone = document.getElementById('checkout-phone');
+            
+            const checkoutSummaryItems = document.getElementById('checkout-summary-items');
+            const checkoutSubtotalEl = document.getElementById('checkout-subtotal');
+            const checkoutTotalEl = document.getElementById('checkout-total');
+            
+            // Order Confirmation Modal
+            const confOverlay = document.getElementById('confirmation-overlay');
+            const redirectTimerEl = document.getElementById('redirect-timer');
+            const confirmEmailDisplay = document.getElementById('confirm-email-display');
+            const confirmPhoneDisplay = document.getElementById('confirm-phone-display');
+
+
+            // --- HELPER FUNCTIONS ---
+            
+            // Formats a number string like "3,200.00" into a float 3200.00
+            function parsePrice(priceString) {
+                // Ensure the price is pulled correctly (remove PKR and commas)
+                const priceMatch = priceString.match(/[\d,.]+/);
+                if (priceMatch) {
+                    return parseFloat(priceMatch[0].replace(/,/g, '').trim());
+                }
+                return 0.00;
+            }
+            
+            // Formats a float 3200.00 into "PKR 3,200.00"
+            function formatPrice(priceFloat) {
+                return `PKR ${priceFloat.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+            
+            // --- FIREBASE ORDER SUBMISSION (NEW FUNCTION) ---
+            async function placeOrder() {
+                // Check if cart is empty before placing order
+                if (window.cart.items.length === 0) {
+                    showFallbackMessage('Order Failed', 'Your cart is empty. Please add items before placing an order.');
+                    return;
+                }
+                
+                // 1. Gather Customer Data
+                const customerData = {
+                    email: checkoutEmail.value,
+                    firstName: checkoutFirstName.value,
+                    lastName: checkoutLastName.value,
+                    phone: checkoutPhone.value,
+                    address: {
+                        country: checkoutCountry.value,
+                        address: checkoutAddress.value,
+                        apartment: checkoutApartment.value,
+                        city: checkoutCity.value,
+                        postalCode: checkoutPostalCode.value,
+                    }
+                };
+                
+                // 2. Gather Order Data
+                const orderItems = window.cart.items.map(item => ({
+                    id: item.id,
+                    title: item.title,
+                    price: parsePrice(item.price),
+                    quantity: item.quantity
+                }));
+                
+                const orderData = {
+                    customer: customerData,
+                    items: orderItems,
+                    total: parsePrice(checkoutTotalEl.textContent),
+                    subtotal: parsePrice(checkoutSubtotalEl.textContent),
+                    status: 'Pending',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                // 3. Save to Firebase
+                try {
+                    if (db) {
+                        // Using the public path to store orders
+                        const docRef = await db.collection(`artifacts/${appId}/public/data/orders`).add(orderData);
+                        console.log("Order successfully written with ID: ", docRef.id);
+                        
+                        // 4. Show Confirmation and Redirect
+                        showConfirmationModal(customerData.email, customerData.phone);
+                        
+                        // Clear the cart locally after successful placement
+                        cartItems = [];
+                        renderCart(); // Update all UI, including empty cart state
+                        
+                    } else {
+                        console.error("Firestore is not initialized. Cannot save order.");
+                        // Use console log since alert() is prohibited
+                        showFallbackMessage('Order Failed', 'Database connection error. Check console for details.');
+                    }
+                } catch (error) {
+                    console.error("Error adding document: ", error);
+                    // Use console log since alert() is prohibited
+                    showFallbackMessage('Order Failed', 'A database error occurred. Check console for details.');
+                }
+            }
+            
+            // --- FALLBACK MESSAGE BOX (Since alert() is prohibited) ---
+            function showFallbackMessage(title, message) {
+                // Since there is no dedicated message box UI, we use console error for debugging
+                // and simply prevent redirection.
+                console.error(title + ": " + message);
+            }
+
+            // --- CONFIRMATION MODAL LOGIC ---
+            function showConfirmationModal(email, phone) {
+                // Populate display values
+                confirmEmailDisplay.textContent = email;
+                confirmPhoneDisplay.textContent = phone;
+                
+                confOverlay.classList.add('active');
+                document.body.classList.add('no-scroll');
+                
+                let count = 5;
+                redirectTimerEl.textContent = count;
+
+                const redirectInterval = setInterval(() => {
+                    count--;
+                    redirectTimerEl.textContent = count;
+                    
+                    if (count <= 0) {
+                        clearInterval(redirectInterval);
+                        confOverlay.classList.remove('active');
+                        document.body.classList.remove('no-scroll');
+                        // Redirect to home page
+                        showPage('home'); 
+                    }
+                }, 1000);
+            }
+            
+            // --- CART LOGIC (Remaining functions are unchanged, keeping for completeness) ---
+            
+            /**
+             * Adds an item to the cart or updates its quantity.
+             * @param {object} item - The product item object.
+             * @param {number} [quantity=1] - The quantity to add.
+             */
+            function addItemToCart(item, quantity = 1) {
+                const existingItem = cartItems.find(i => i.id === item.id);
+                
+                if (existingItem) {
+                    existingItem.quantity += quantity;
+                } else {
+                    // When adding from the detail page or card, item object contains required fields
+                    cartItems.push({ 
+                        id: item.id, 
+                        title: item.name || item.title,
+                        price: item.price,
+                        imgSrc: item.img || item.imgSrc,
+                        quantity: quantity 
+                    });
+                }
+                
+                // Show upsell if 1 item in cart
+                upsellSection.classList.toggle('hidden', cartItems.length !== 1);
+                
+                renderCart();
+            }
+
+            /**
+             * Updates the quantity of a specific item in the cart.
+             * @param {string} itemId - The ID of the item to update.
+             * @param {number} newQuantity - The new quantity.
+             */
+            function updateItemQuantity(itemId, newQuantity) {
+                const item = cartItems.find(i => i.id === itemId);
+                if (item) {
+                    if (newQuantity > 0) {
+                        item.quantity = newQuantity;
+                    } else {
+                        // Remove item if quantity is 0 or less
+                        cartItems = cartItems.filter(i => i.id !== itemId);
+                    }
+                }
+                
+                // Hide upsell if cart length is not 1
+                upsellSection.classList.toggle('hidden', cartItems.length !== 1);
+                
+                renderCart();
+            }
+
+            /**
+             * Removes an item from the cart.
+             * @param {string} itemId - The ID of the item to remove.
+             */
+            function removeItemFromCart(itemId) {
+                cartItems = cartItems.filter(i => i.id !== itemId);
+                
+                // Hide upsell if cart length is not 1
+                upsellSection.classList.toggle('hidden', cartItems.length !== 1);
+                
+                renderCart();
+            }
+            
+            /**
+             * Calculates the subtotal of all items in the cart.
+             * @returns {number} The total price.
+             */
+            function calculateSubtotal() {
+                return cartItems.reduce((total, item) => {
+                    // Handle price formatting consistency
+                    let priceValue = parsePrice(item.price);
+                    return total + (priceValue * item.quantity);
+                }, 0);
+            }
+            
+            /**
+             * Re-renders all cart-related UI elements.
+             */
+            function renderCart() {
+                const subtotal = calculateSubtotal();
+                const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+                
+                // --- 1. Render Cart Modal (Slide-in) ---
+                cartItemsContainer.innerHTML = ''; // Clear items
+                
+                if (cartItems.length === 0) {
+                    cartEmptyMsg.classList.remove('hidden');
+                } else {
+                    cartEmptyMsg.classList.add('hidden');
+                    cartItems.forEach(item => {
+                        const itemEl = document.createElement('div');
+                        itemEl.className = 'flex items-center gap-4';
+                        itemEl.innerHTML = `
+                            <img src="${item.imgSrc}" alt="${item.title}" class="w-20 h-20 object-cover rounded-md border border-gray-200">
+                            <div class="flex-1">
+                                <p class="font-semibold text-sm">${item.title}</p>
+                                <p class="text-xs text-gray-600">${item.price}</p>
+                                <div class="flex items-center mt-2">
+                                    <button class="cart-qty-decrease px-2 py-0.5 border border-gray-300 rounded-l-md hover:bg-gray-100" data-id="${item.id}">-</button>
+                                    <input type="text" value="${item.quantity}" class="w-10 text-center border-t border-b border-gray-300 py-0.5 text-sm bg-white" readonly>
+                                    <button class="cart-qty-increase px-2 py-0.5 border border-gray-300 rounded-r-md hover:bg-gray-100" data-id="${item.id}">+</button>
+                                </div>
+                            </div>
+                            <button class="cart-remove-item text-gray-400 hover:text-red-500" data-id="${item.id}" aria-label="Remove item">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                        `;
+                        cartItemsContainer.appendChild(itemEl);
+                    });
+                }
+                
+                // Update badge
+                if (totalItems > 0) {
+                    cartItemCountBadge.textContent = totalItems;
+                    cartItemCountBadge.classList.remove('hidden');
+                } else {
+                    cartItemCountBadge.classList.add('hidden');
+                }
+                
+                // Update subtotal
+                cartSubtotalEl.textContent = formatPrice(subtotal);
+                
+                // --- 2. Render Cart Page (Full) ---
+                cartPageItemsContainer.innerHTML = ''; // Clear items
+                
+                // Add header row back
+                const headerHTML = `
+                    <div class="cart-header-row max-md:hidden">
+                        <div class_name="col-span-1"></div> <div class="col-span-1">Product</div>
+                        <div class="col-span-1">Price</div>
+                        <div class="col-span-1">Quantity</div>
+                        <div class="col-span-1 text-right">Total</div>
+                    </div>`;
+                cartPageItemsContainer.innerHTML = headerHTML;
+
+                if (cartItems.length === 0) {
+                    // Show empty message
+                    const emptyMsgHTML = `
+                    <div id="cart-page-empty-msg" class="text-center py-16">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        <h2 class="text-2xl font-semibold mb-2">Your cart is empty</h2>
+                        <p class="text-gray-600 mb-6">Looks like you haven't added anything to your cart yet.</p>
+                        <button class="continue-shopping-btn bg-black text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-gray-800 transition-all duration-300">
+                            Continue Shopping
+                        </button>
+                    </div>`;
+                    cartPageItemsContainer.innerHTML += emptyMsgHTML;
+                } else {
+                    // Render item rows
+                    cartItems.forEach(item => {
+                        // Ensure price is parsed correctly for calculation
+                        const priceValue = parsePrice(item.price);
+                        const itemTotal = priceValue * item.quantity;
+                        
+                        // Use the raw price string for display in the row
+                        const displayPrice = item.price;
+
+                        const itemRowHTML = `
+                        <div class="cart-item-row">
+                            <div class="cart-item-image">
+                                <img src="${item.imgSrc}" alt="${item.title}" class="w-24 h-24 object-cover rounded-md border border-gray-200">
+                            </div>
+                            <div class="cart-item-title">
+                                <p class="font-semibold text-base">${item.title}</p>
+                                <button class="cart-page-remove-item text-gray-400 hover:text-red-500 text-xs underline mt-1" data-id="${item.id}">Remove</button>
+                            </div>
+                            <div class="cart-item-price max-md:hidden">
+                                <p>${displayPrice}</p>
+                            </div>
+                            <div class="cart-item-qty">
+                                <div class="flex items-center">
+                                    <button class="cart-qty-decrease px-3 py-1.5 border border-gray-300 rounded-l-md hover:bg-gray-100" data-id="${item.id}">-</button>
+                                    <input type="text" value="${item.quantity}" class="w-12 text-center border-t border-b border-gray-300 py-1.5 bg-white" readonly>
+                                    <button class="cart-qty-increase px-3 py-1.5 border border-gray-300 rounded-r-md hover:bg-gray-100" data-id="${item.id}">+</button>
+                                </div>
+                            </div>
+                            <div class="cart-item-total text-right max-md:hidden">
+                                <p class="font-semibold">${formatPrice(itemTotal)}</p>
+                            </div>
+                        </div>`;
+                        cartPageItemsContainer.innerHTML += itemRowHTML;
+                    });
+                }
+                
+                // Update page subtotal
+                cartPageSubtotalEl.textContent = formatPrice(subtotal);
+                cartPageCheckoutBtn.disabled = cartItems.length === 0;
+
+                
+                // --- 3. Render Checkout Summary ---
+                checkoutSummaryItems.innerHTML = ''; // Clear
+                
+                cartItems.forEach(item => {
+                    const priceValue = parsePrice(item.price);
+                    const itemTotal = priceValue * item.quantity;
+                    const itemHTML = `
+                    <div class="flex items-center gap-4">
+                        <div class="relative">
+                            <img src="${item.imgSrc}" alt="${item.title}" class="w-16 h-16 object-cover rounded-lg border border-gray-200">
+                            <span class="absolute -top-2 -right-2 bg-gray-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">${item.quantity}</span>
+                        </div>
+                        <div class="flex-1">
+                            <p class="font-semibold text-sm">${item.title}</p>
+                        </div>
+                        <p class="text-sm font-semibold">${formatPrice(itemTotal)}</p>
+                    </div>`;
+                    checkoutSummaryItems.innerHTML += itemHTML;
+                });
+                
+                checkoutSubtotalEl.textContent = formatPrice(subtotal);
+                checkoutTotalEl.textContent = formatPrice(subtotal); // Assuming free shipping
+            }
+            
+            // --- MODAL CONTROLS ---
+            function openCart() {
+                cartOverlay.classList.add('active');
+                cartModal.classList.add('active');
+                document.body.classList.add('no-scroll'); // FIXED: Correctly lock scroll
+            }
+            
+            function closeCart() {
+                cartOverlay.classList.remove('active');
+                cartModal.classList.remove('active');
+                document.body.classList.remove('no-scroll');
+            }
+            
+            // --- TIMER CONTROLS ---
+            function startCartTimer() {
+                let duration = 20 * 60; // 20 minutes in seconds
+                if (cartTimerInterval) clearInterval(cartTimerInterval);
+                
+                function updateTimer() {
+                    const minutes = Math.floor(duration / 60);
+                    const seconds = duration % 60;
+                    
+                    if (cartPageTimerEl) {
+                        cartPageTimerEl.textContent = `${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`;
+                    }
+                    
+                    if (--duration < 0) {
+                        clearInterval(cartTimerInterval);
+                        if (cartPageTimerEl) {
+                            cartPageTimerEl.textContent = "Cart Expired";
+                        }
+                        // Optionally, you could clear the cart here
+                        // cartItems = [];
+                        // renderCart();
+                    }
+                }
+                
+                updateTimer(); // Run once immediately
+                cartTimerInterval = setInterval(updateTimer, 1000);
+            }
+
+            // --- EVENT LISTENERS ---
+            
+            // Open cart modal
+            cartIconBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                openCart();
+            });
+            
+            // Close cart modal
+            cartCloseBtn.addEventListener('click', closeCart);
+            cartOverlay.addEventListener('click', (e) => {
+                if (e.target === cartOverlay) {
+                    closeCart();
+                }
+            });
+            
+            // "View Cart" button in modal
+            cartViewCartBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                closeCart();
+                showPage('cart'); // Navigate to the full cart page
+                startCartTimer(); // Start the timer when viewing the page
+            });
+            
+            // "Continue Shopping" buttons
+            document.body.addEventListener('click', e => {
+                if (e.target.classList.contains('continue-shopping-btn')) {
+                    e.preventDefault();
+                    showPage('shop');
+                }
+            });
+
+            // Add Upsell Item
+            addUpsellBtn.addEventListener('click', (e) => {
+                const btn = e.target;
+                const item = {
+                    id: btn.dataset.productId,
+                    title: btn.dataset.title,
+                    price: btn.dataset.price,
+                    imgSrc: btn.dataset.imgSrc
+                };
+                addItemToCart(item, 1);
+                upsellSection.classList.add('hidden'); // Hide after adding
+            });
+
+            // Cart Modal: Quantity & Remove
+            cartItemsContainer.addEventListener('click', (e) => {
+                const target = e.target;
+                const id = target.dataset.id;
+                if (!id) return;
+                
+                if (target.classList.contains('cart-qty-increase')) {
+                    const item = cartItems.find(i => i.id === id);
+                    updateItemQuantity(id, item.quantity + 1);
+                }
+                
+                if (target.classList.contains('cart-qty-decrease')) {
+                    const item = cartItems.find(i => i.id === id);
+                    updateItemQuantity(id, item.quantity - 1);
+                }
+                
+                if (target.closest('.cart-remove-item')) {
+                    removeItemFromCart(id);
+                }
+            });
+            
+            // Cart Page: Quantity & Remove
+            cartPageItemsContainer.addEventListener('click', (e) => {
+                const target = e.target;
+                const id = target.dataset.id;
+                if (!id) return;
+                
+                if (target.classList.contains('cart-qty-increase')) {
+                    const item = cartItems.find(i => i.id === id);
+                    updateItemQuantity(id, item.quantity + 1);
+                }
+                
+                if (target.classList.contains('cart-qty-decrease')) {
+                    const item = cartItems.find(i => i.id === id);
+                    updateItemQuantity(id, item.quantity - 1);
+                }
+                
+                if (target.closest('.cart-page-remove-item')) {
+                    removeItemFromCart(id);
+                }
+            });
+            
+            // Cart Modal: Terms Checkbox
+            cartTermsCheck.addEventListener('change', () => {
+                cartCheckoutBtn.disabled = !cartTermsCheck.checked;
+            });
+            
+            // Cart Modal: Checkout Button
+            cartCheckoutBtn.addEventListener('click', () => {
+                if (!cartTermsCheck.checked) return;
+                closeCart();
+                showPage('checkout');
+            });
+            
+            // Cart Page: Checkout Button
+            cartPageCheckoutBtn.addEventListener('click', () => {
+                showPage('checkout');
+            });
+            
+            // --- Checkout Form Submission (NEW) ---
+            checkoutForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // Form validation is handled by HTML 'required' attributes, but we ensure one final check
+                // This line will prevent execution if any required fields are empty
+                if (checkoutForm.checkValidity()) {
+                    placeOrder();
+                } else {
+                    // This should generally not be hit if required attributes are used correctly
+                    console.error('Form validation failed.');
+                }
+            });
+
+            
+            // --- GLOBAL API ---
+            // Expose cart functions to other scripts (like Quick View)
+            window.cart = {
+                add: addItemToCart,
+                update: updateItemQuantity,
+                remove: removeItemFromCart,
+                open: openCart,
+                close: closeCart,
+                render: renderCart,
+                items: cartItems // Expose items for Firebase submission
+            };
+            
+            // --- INITIAL RENDER ---
+            renderCart();
+
+        })();
+    </script>
+
+
+    <script id="search-script">
+        (function() {
+            // --- SELECTORS ---
+            const searchIconBtn = document.getElementById('search-icon-btn');
+            const searchOverlay = document.getElementById('search-overlay');
+            const searchInput = document.getElementById('search-input');
+            const searchCloseBtn = document.getElementById('search-close-btn');
+            const searchResultsContainer = document.getElementById('search-results-container');
+            
+            let isSearchOpen = false;
+            let allProductsCache = [];
+            
+            // Helper function to debounce search input
+            function debounce(func, delay) {
+                let timeout;
+                return function(...args) {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => func.apply(this, args), delay);
+                };
+            }
+            
+            // --- CORE LOGIC ---
+            
+            /**
+             * Toggles the search overlay visibility.
+             */
+            window.toggleSearch = function() {
+                isSearchOpen = !isSearchOpen;
+                searchOverlay.classList.toggle('active', isSearchOpen);
+                document.body.classList.toggle('no-scroll', isSearchOpen);
+                
+                if (isSearchOpen) {
+                    // Focus the input and clear results when opening
+                    searchInput.value = '';
+                    searchResultsContainer.innerHTML = '';
+                    setTimeout(() => searchInput.focus(), 300); // Small delay for animation
+                    
+                    // Cache all products when the search is opened
+                    if (allProductsCache.length === 0 && window.getAllProducts) {
+                         allProductsCache = window.getAllProducts();
+                    }
+                }
+            };
+            
+            /**
+             * Performs the search and renders results.
+             */
+            function performSearch() {
+                const query = searchInput.value.trim().toLowerCase();
+                searchResultsContainer.innerHTML = ''; // Clear previous results
+
+                if (query.length === 0) {
+                    // Display initial helpful message or nothing
+                    searchResultsContainer.innerHTML = `<p class="p-4 text-center text-gray-500">Start typing to see watch suggestions.</p>`;
+                    return;
+                }
+                
+                // Filter the cached product list
+                const filteredProducts = allProductsCache.filter(product => 
+                    product.name.toLowerCase().includes(query) || 
+                    product.description.toLowerCase().includes(query)
+                ).slice(0, 5); // Limit to 5 results as seen in the video example
+
+                if (filteredProducts.length === 0) {
+                    searchResultsContainer.innerHTML = `<p class="p-4 text-center text-gray-500">No results found for "${searchInput.value}".</p>`;
+                    return;
+                }
+                
+                // Render the results
+                filteredProducts.forEach(product => {
+                    const price = `PKR ${product.price}`;
+                    
+                    const resultItem = document.createElement('a');
+                    // Use the quick-view function to transition to the detail page
+                    resultItem.href = "#"; 
+                    resultItem.className = 'search-result-item';
+                    resultItem.dataset.productId = product.id; // For detail page function
+                    
+                    resultItem.innerHTML = `
+                        <img src="${product.img}" alt="${product.name}">
+                        <div class="search-result-details">
+                            <p class="title">${product.name}</p>
+                            <p class="price">${price}</p>
+                        </div>
+                    `;
+                    
+                    // Add click listener to open the detail page and close search
+                    resultItem.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        window.openProductDetailPage(product.id);
+                        window.toggleSearch(); // Close the search overlay
+                    });
+
+                    searchResultsContainer.appendChild(resultItem);
+                });
+            }
+            
+            const debouncedSearch = debounce(performSearch, 200);
+
+            // --- EVENT LISTENERS ---
+            
+            // 1. Open Search: Click on the header search icon
+            searchIconBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.toggleSearch();
+            });
+            
+            // 2. Close Search: Click on the 'X' button
+            searchCloseBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.toggleSearch();
+            });
+            
+            // 3. Search Input: Keyup event for instant search
+            searchInput.addEventListener('keyup', debouncedSearch);
+            
+            // 4. Close Search on global click outside (optional but good UX)
+            document.body.addEventListener('click', (e) => {
+                if (isSearchOpen && !searchOverlay.contains(e.target) && !searchIconBtn.contains(e.target)) {
+                    window.toggleSearch();
+                }
+            });
+            
+            // Prevent clicks inside the result box from closing the search overlay immediately
+            searchResultsContainer.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+            
+            // --- INITIALIZATION ---
+            // The product cache will be filled the first time the search is opened, 
+            // ensuring getAllProducts has run after the pagination script.
+        })();
+    </script>
+
+    <script id="social-proof-timers">
+        // --- Social Proof Timers Script ---
+        (function() {
+            let viewingIntervalId = null;
+            let soldTimeoutId = null;
+            const VIEWING_EL = document.getElementById('social-proof-viewing');
+            const SOLD_EL = document.getElementById('social-proof-sold');
+            const DETAIL_PAGE = document.getElementById('product-detail-page');
+
+            function getRandomInt(min, max) {
+                // Return a random integer between min and max (inclusive)
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            }
+
+            // 1. Viewing Counter (Every 3 seconds, 5-150)
+            function updateViewingCounter() {
+                if (!VIEWING_EL) return;
+                const viewers = getRandomInt(5, 150);
+                VIEWING_EL.textContent = `${viewers} people are viewing this right now`;
+            }
+
+            // 2. Sold Counter (Every 5 hours, 10-200)
+            function updateSoldCounter() {
+                if (!SOLD_EL) return;
+                const soldCount = getRandomInt(10, 200);
+                // Hours sold in last X hours (X is random 1-24, using 16 as an initial default)
+                const hours = getRandomInt(1, 24); 
+                SOLD_EL.textContent = `${soldCount} sold in last ${hours} hours`;
+                
+                // Re-set the timeout for the next 5 hours (5 hours * 3600 seconds * 1000 milliseconds)
+                const fiveHoursInMs = 5 * 60 * 60 * 1000;
+                // Clear any existing timeout before setting a new one
+                if (soldTimeoutId) clearTimeout(soldTimeoutId);
+                soldTimeoutId = setTimeout(updateSoldCounter, fiveHoursInMs);
+            }
+            
+            // Function to manage the viewing counter based on page visibility
+            function manageViewingTimer() {
+                const isDetailPageVisible = DETAIL_PAGE && !DETAIL_PAGE.classList.contains('hidden');
+                
+                if (isDetailPageVisible && viewingIntervalId === null) {
+                    // Page is visible, start the interval
+                    updateViewingCounter(); // Initial update
+                    viewingIntervalId = setInterval(updateViewingCounter, 3000); // Update every 3 seconds
+                } else if (!isDetailPageVisible && viewingIntervalId !== null) {
+                    // Page is hidden, stop the interval
+                    clearInterval(viewingIntervalId);
+                    viewingIntervalId = null;
+                }
+            }
+            
+            // Intercept the global showPage function to manage the viewing timer
+            const originalShowPage = window.showPage;
+            window.showPage = function(pageName) {
+                originalShowPage(pageName);
+                
+                // If navigating to the detail page, start/check timers
+                if (pageName === 'product-detail') {
+                    manageViewingTimer();
+                } else {
+                    // If navigating away, ensure the viewing timer is stopped
+                    if (viewingIntervalId !== null) {
+                         clearInterval(viewingIntervalId);
+                         viewingIntervalId = null;
+                    }
+                }
+            };
+
+            // Initial load checks
+            window.addEventListener('load', () => {
+                // Start the sold counter immediately and set the 5-hour recurrence
+                updateSoldCounter(); 
+                
+                // Check if the detail page is visible on load 
+                manageViewingTimer();
+            });
+        })();
+    </script>
+
+    <script>
+        window.addEventListener('load', function() {
+            const startTime = new Date().getTime();
+            const preloader = document.getElementById('preloader');
+            const minDuration = 3000; // 3 seconds
+
+            function hidePreloader() {
+                // Add fade-out class
+                preloader.classList.add('fade-out');
+                
+                // Remove from DOM after transition
+                // Using setTimeout as a reliable fallback to ensure removal
+                setTimeout(() => {
+                    preloader.style.display = 'none';
+                }, 750); // Match CSS transition duration
+            }
+
+            const loadTime = new Date().getTime() - startTime;
+
+            if (loadTime < minDuration) {
+                setTimeout(hidePreloader, minDuration - loadTime);
+            } else {
+                hidePreloader();
+            }
+        });
+    </script>
+</body>
+</html>
