@@ -1285,10 +1285,8 @@
                                     <p class="text-sm text-gray-700 font-semibold">Availability: <span id="detail-stock" class="text-green-600">In Stock</span></p>
                                     <p class="text-sm text-gray-700 mt-1">Delivery Estimate: <span id="detail-delivery">3-5 business days</span></p>
                                     
-                                    <!-- Social Proof Elements -->
                                     <div class="mt-3 flex flex-col space-y-2 text-sm font-semibold text-gray-700">
                                         <div class="flex items-center text-red-600">
-                                            <!-- Eye Icon -->
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -1296,7 +1294,6 @@
                                             <span id="social-proof-viewing">35 people are viewing this right now</span>
                                         </div>
                                         <div class="flex items-center text-red-600">
-                                            <!-- Fire Icon -->
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 7 9c2.31 2.31 4 4 4 4s-.69 1.69-.69 1.69a8.001 8.001 0 0110.154 0l-.657-.657z" />
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 21.05v-2.1m0 0a2 2 0 100-4 2 2 0 000 4zm0 0a2 2 0 100-4 2 2 0 000 4z" />
@@ -1304,8 +1301,7 @@
                                             <span id="social-proof-sold">86 sold in last 16 hours</span>
                                         </div>
                                     </div>
-                                    <!-- End Social Proof Elements -->
-                                </div>
+                                    </div>
                                 
                                 <div class="mb-6">
                                     <label for="detail-quantity" class="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
@@ -3313,5 +3309,14 @@
             }
         });
     </script>
+    
+<script src="js/shopify-api.js"></script>
+
+<script>
+ fetchProducts(6).then(products => {
+   console.log(products); // You can later display them in your HTML grid
+ });
+</script>
+
 </body>
 </html>
